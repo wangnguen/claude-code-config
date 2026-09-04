@@ -50,13 +50,13 @@ Hậu tố viết **thường** (`-vn`), không phải `-VN`.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/wangnguen/ccc/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/wangnguen/claude-code-config/main/install.ps1 | iex
 ```
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wangnguen/ccc/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/wangnguen/claude-code-config/main/install.sh | bash
 ```
 
 Script tải binary từ GitHub Releases, giải nén vào `~/.ccc`, và thêm thư mục đó

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const SETTINGS_FILE: &str = "settings.local.json";
-pub const REPO: &str = "wangnguen/ccc";
+pub const REPO: &str = "wangnguen/claude-code-config";
 
 /// LiteLLM virtual keys are bearer tokens and belong in ANTHROPIC_AUTH_TOKEN.
 pub const ENV_AUTH_TOKEN: &str = "ANTHROPIC_AUTH_TOKEN";

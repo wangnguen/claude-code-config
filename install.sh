@@ -2,7 +2,7 @@
 set -e
 
 CCC_HOME="$HOME/.ccc"
-REPO="wangnguen/ccc"
+REPO="wangnguen/claude-code-config"
 
 # Detect OS and arch
 OS="$(uname -s)"

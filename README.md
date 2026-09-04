@@ -7,18 +7,18 @@ Quick setup tool for Claude Code configuration, with a built-in interactive TUI 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/wangnguen/ccc/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/wangnguen/claude-code-config/main/install.ps1 | iex
 ```
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wangnguen/ccc/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/wangnguen/claude-code-config/main/install.sh | bash
 ```
 
 ### Manual install
 
-Download binary from [Releases](https://github.com/wangnguen/ccc/releases), place it in a folder and add to PATH.
+Download binary from [Releases](https://github.com/wangnguen/claude-code-config/releases), place it in a folder and add to PATH.
 
 ## Usage
 

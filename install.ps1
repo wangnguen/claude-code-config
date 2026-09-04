@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $CccHome = "$env:USERPROFILE\.ccc"
-$Repo = "wangnguen/ccc"
+$Repo = "wangnguen/claude-code-config"
 $AssetName = "ccc-x86_64-pc-windows-msvc.zip"
 
 Write-Host "Fetching latest release..." -ForegroundColor Cyan
