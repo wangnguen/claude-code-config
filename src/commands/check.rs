@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 
-use crate::api::{get_api_config, get_current_key, is_vn_model, list_models, VN_SUFFIX};
+use crate::api::{base_model_id, get_api_config, get_current_key, is_vn_model, list_models, VN_SUFFIX};
 use crate::config::{
     effective_settings_path, read_json_or_default, ENV_GATEWAY_DISCOVERY, MODEL_ENV_KEYS,
 };
@@ -95,7 +95,9 @@ pub fn run() -> Result<()> {
     for name in MODEL_ENV_KEYS {
         match json["env"][*name].as_str().filter(|v| !v.is_empty()) {
             Some(value) => {
-                let allowed = models.iter().any(|m| m == value);
+                // Compare on the bare id: a `[1m]` marker is client-side only
+                // and never appears in the gateway's list.
+                let allowed = models.iter().any(|m| m == base_model_id(value));
                 let detail = if allowed {
                     value.to_string()
                 } else {

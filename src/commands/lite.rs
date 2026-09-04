@@ -13,10 +13,14 @@ const LITE_BASE_URL: &str = "https://litellm-proxy-ep-cncyfugmcnadc6g4.a02.azure
 // selecting one returns "403 key not allowed to access model". Leaving any of
 // these unset is not an option either: Claude Code then falls back to a
 // built-in id (e.g. claude-haiku-4-5-20251001) and fails the same way.
-const LITE_MODEL: &str = "claude-sonnet-5-vn";
+//
+// `[1m]` picks the 1M-context variant. Only Sonnet and Opus have one; Haiku
+// 4.5 does not, so the two Haiku slots stay bare. Keep these in sync with
+// default/.claude/settings.local.json — `ccc lite` overwrites the copied file.
+const LITE_MODEL: &str = "claude-sonnet-5-vn[1m]";
 const LITE_SMALL_FAST_MODEL: &str = "claude-haiku-4-5-vn";
-const LITE_DEFAULT_SONNET_MODEL: &str = "claude-sonnet-5-vn";
-const LITE_DEFAULT_OPUS_MODEL: &str = "claude-opus-5-vn";
+const LITE_DEFAULT_SONNET_MODEL: &str = "claude-sonnet-5-vn[1m]";
+const LITE_DEFAULT_OPUS_MODEL: &str = "claude-opus-5-vn[1m]";
 const LITE_DEFAULT_HAIKU_MODEL: &str = "claude-haiku-4-5-vn";
 
 pub fn run() -> Result<()> {

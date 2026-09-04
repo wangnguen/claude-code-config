@@ -79,8 +79,29 @@ Two consequences worth knowing:
   `ANTHROPIC_SMALL_FAST_MODEL`. Leaving one unset is not safe: Claude Code then
   falls back to a built-in id and fails the same way.
 
-`ccc lite` defaults to `claude-sonnet-5-vn` for the main and Sonnet slots,
-`claude-opus-5-vn` for Opus, and `claude-haiku-4-5-vn` for the fast slot.
+## 1M context (`[1m]`)
+
+A `-vn` name may carry a `[1m]` marker to select the 1M-context variant:
+
+```
+claude-sonnet-5-vn[1m]
+claude-opus-5-vn[1m]
+```
+
+The marker is client-side. Claude Code parses it off, sends the bare id to the
+gateway and turns `[1m]` into the long-context beta header — so `ccc models`
+never lists a name with brackets, and a config value like
+`claude-sonnet-5-vn[1m]` matching a gateway model `claude-sonnet-5-vn` is
+correct, not a mismatch.
+
+Only Sonnet and Opus have a 1M variant. Haiku 4.5 does not, so
+`ANTHROPIC_SMALL_FAST_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL` stay bare.
+
+The marker goes *after* the `-vn` suffix, never before: `claude-sonnet-5-vn[1m]`
+is right, `claude-sonnet-5[1m]-vn` is not a model id.
+
+`ccc lite` defaults to `claude-sonnet-5-vn[1m]` for the main and Sonnet slots,
+`claude-opus-5-vn[1m]` for Opus, and `claude-haiku-4-5-vn` for the fast slot.
 
 Run `ccc check` to verify all of this at once, and `ccc models` to see the list.
 

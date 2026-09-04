@@ -187,7 +187,8 @@ set_auth_token(&mut json, &token);   // ghi AUTH_TOKEN và xoá API_KEY cũ
 
 ### Tên model
 
-Mọi tên model phải kết thúc bằng `-vn`. Kiểm tra bằng:
+Mọi tên model phải kết thúc bằng `-vn`, có thể theo sau bởi marker context
+`[1m]` (vd `claude-sonnet-5-vn[1m]`). Kiểm tra bằng:
 
 ```rust
 use crate::api::is_vn_model;
@@ -196,6 +197,20 @@ if !is_vn_model(&model) {
     // model này sẽ nhận 403
 }
 ```
+
+`is_vn_model()` tự strip `[1m]` nên nhận cả hai dạng.
+
+Khi **so khớp với danh sách model gateway trả về**, phải strip marker trước —
+gateway chỉ biết id trần:
+
+```rust
+use crate::api::base_model_id;
+
+let allowed = models.iter().any(|m| m == base_model_id(&model));
+```
+
+Dùng `m == model` trực tiếp sẽ báo "not in your key's model list" giả với mọi
+config có `[1m]`.
 
 ## Quy trình release
 

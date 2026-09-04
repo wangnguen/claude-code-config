@@ -45,6 +45,30 @@ id model khác, không tồn tại trên gateway. Luôn chọn tên có `-vn`.
 
 Hậu tố viết **thường** (`-vn`), không phải `-VN`.
 
+## 1M context (`[1m]`)
+
+Tên model `-vn` có thể mang thêm marker `[1m]` để chọn bản context 1 triệu token:
+
+```
+claude-sonnet-5-vn[1m]
+claude-opus-5-vn[1m]
+```
+
+Marker này là **client-side**. Claude Code tách `[1m]` ra, gửi id trần
+(`claude-sonnet-5-vn`) tới gateway, và chuyển `[1m]` thành beta header
+long-context. Hệ quả:
+
+- `ccc models` không bao giờ liệt kê tên có ngoặc vuông — gateway chỉ biết id trần.
+- Config ghi `claude-sonnet-5-vn[1m]` mà gateway trả `claude-sonnet-5-vn` là
+  **đúng**, không phải lệch. `ccc check` và `ccc doctor` đã strip marker trước
+  khi so khớp (hàm `base_model_id()` trong `api.rs`).
+
+Chỉ Sonnet và Opus có bản 1M. Haiku 4.5 không có, nên
+`ANTHROPIC_SMALL_FAST_MODEL` và `ANTHROPIC_DEFAULT_HAIKU_MODEL` để trần.
+
+Marker đặt **sau** hậu tố `-vn`: `claude-sonnet-5-vn[1m]` đúng,
+`claude-sonnet-5[1m]-vn` sai.
+
 ## Cài đặt
 
 ### Windows
@@ -131,8 +155,11 @@ Phân biệt hai lệnh dễ nhầm:
 ```bash
 ccc config list
 ccc config get base_url
-ccc config set sonnet_model claude-sonnet-5-vn
+ccc config set sonnet_model claude-sonnet-5-vn[1m]
 ```
+
+Lưu ý shell: `[` và `]` là ký tự đặc biệt trong PowerShell và zsh. Nếu gặp lỗi
+parse, bọc giá trị trong nháy đơn: `ccc config set sonnet_model 'claude-sonnet-5-vn[1m]'`.
 
 Các khoá hợp lệ: `base_url`, `main_model`, `fast_model`, `model`, `sonnet_model`,
 `opus_model`, `haiku_model`, `discovery`, `disable_traffic`.

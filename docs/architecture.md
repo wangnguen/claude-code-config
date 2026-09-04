@@ -181,5 +181,13 @@ Home  →  KeyDashboard  →  Normal (bảng key)
    được git theo dõi, key lọt vào là lên GitHub.
 2. **Mọi giá trị bí mật phải qua `mask_key()` hoặc `redact_secrets()` trước khi in.**
 3. **Không ghi `ANTHROPIC_API_KEY` mới.** Dùng `set_auth_token()`.
-4. **Tên model phải kết thúc bằng `-vn`.** Hàm `is_vn_model()` trong `api.rs` là
+4. **Tên model phải kết thúc bằng `-vn`**, có thể theo sau bởi marker context
+   `[1m]` (vd `claude-sonnet-5-vn[1m]`). Hàm `is_vn_model()` trong `api.rs` là
    nơi kiểm tra điều này.
+5. **Mọi so sánh với danh sách model của gateway phải đi qua `base_model_id()`.**
+   Marker `[1m]` là client-side, gateway không bao giờ trả về tên có ngoặc vuông
+   — so khớp nguyên chuỗi sẽ báo lệch giả.
+6. **Model mặc định nằm ở hai nơi và phải khớp nhau:**
+   `default/.claude/settings.local.json` (file `ccc init` copy) và các hằng
+   `LITE_*` trong `commands/lite.rs` (ghi đè file đó khi chạy `ccc lite`). Sửa
+   một chỗ mà quên chỗ kia thì `ccc lite` sẽ âm thầm revert.

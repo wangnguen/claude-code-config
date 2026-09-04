@@ -7,7 +7,7 @@ use crate::config::{
 /// LiteLLM proxy the team's virtual keys are issued against.
 pub const DEFAULT_BASE_URL: &str = "https://litellm-proxy-ep-cncyfugmcnadc6g4.a02.azurefd.net";
 /// Fallback main model. Must be a gateway model name, not a built-in one.
-pub const DEFAULT_MODEL: &str = "claude-sonnet-5-vn";
+pub const DEFAULT_MODEL: &str = "claude-sonnet-5-vn[1m]";
 /// Suffix marking the models this team's virtual keys are allowed to use.
 pub const VN_SUFFIX: &str = "-vn";
 
@@ -39,9 +39,22 @@ fn default_api_config() -> (String, String) {
     (DEFAULT_BASE_URL.to_string(), DEFAULT_MODEL.to_string())
 }
 
+/// Strip the context-window marker Claude Code allows after a model name.
+///
+/// `claude-sonnet-5-vn[1m]` selects the 1M-context variant: Claude Code parses
+/// the `[1m]` client-side, sends the bare id to the gateway and turns the
+/// marker into a beta header. The gateway's own model list therefore never
+/// carries it, so every comparison against that list must strip it first.
+pub fn base_model_id(id: &str) -> &str {
+    match id.find('[') {
+        Some(i) => id[..i].trim_end(),
+        None => id,
+    }
+}
+
 /// True for models this team's virtual keys are entitled to (the `-vn` group).
 pub fn is_vn_model(id: &str) -> bool {
-    id.to_lowercase().ends_with(VN_SUFFIX)
+    base_model_id(id).to_lowercase().ends_with(VN_SUFFIX)
 }
 
 /// Ask the gateway which models the key may use.
@@ -149,4 +162,55 @@ pub fn get_current_key() -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_model_id_strips_context_marker() {
+        assert_eq!(base_model_id("claude-sonnet-5-vn[1m]"), "claude-sonnet-5-vn");
+        assert_eq!(base_model_id("claude-opus-5-vn[1m]"), "claude-opus-5-vn");
+    }
+
+    #[test]
+    fn base_model_id_passes_bare_names_through() {
+        assert_eq!(base_model_id("claude-haiku-4-5-vn"), "claude-haiku-4-5-vn");
+        assert_eq!(base_model_id(""), "");
+    }
+
+    #[test]
+    fn base_model_id_handles_marker_edges() {
+        // Stray space before the marker, and a marker with nothing in front.
+        assert_eq!(base_model_id("claude-sonnet-5-vn [1m]"), "claude-sonnet-5-vn");
+        assert_eq!(base_model_id("[1m]"), "");
+    }
+
+    #[test]
+    fn is_vn_model_accepts_context_marker() {
+        assert!(is_vn_model("claude-sonnet-5-vn[1m]"));
+        assert!(is_vn_model("claude-opus-5-vn[1m]"));
+    }
+
+    #[test]
+    fn is_vn_model_is_case_insensitive() {
+        assert!(is_vn_model("claude-haiku-4-5-vn"));
+        assert!(is_vn_model("CLAUDE-SONNET-5-VN"));
+        assert!(is_vn_model("CLAUDE-SONNET-5-VN[1M]"));
+    }
+
+    #[test]
+    fn is_vn_model_rejects_builtin_names() {
+        assert!(!is_vn_model("claude-sonnet-5"));
+        assert!(!is_vn_model("claude-haiku-4-5-20251001"));
+        // A marker does not make a built-in reachable: the 403 comes from the
+        // id, not from the context window.
+        assert!(!is_vn_model("claude-sonnet-5[1m]"));
+    }
+
+    #[test]
+    fn defaults_are_reachable_models() {
+        assert!(is_vn_model(DEFAULT_MODEL));
+    }
 }
