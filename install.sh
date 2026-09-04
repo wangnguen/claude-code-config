@@ -40,7 +40,7 @@ curl -fsSL "$DOWNLOAD_URL" -o "$TMP_ZIP"
 # Extract and copy to CccHome
 unzip -o "$TMP_ZIP" -d "$TMP_DIR"
 mkdir -p "$CCC_HOME"
-cp -r "$TMP_DIR"/ccc-*/* "$CCC_HOME/"
+cp -r "$TMP_DIR"/ccc-*/. "$CCC_HOME/"
 chmod +x "$CCC_HOME/ccc"
 
 # Cleanup
