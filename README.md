@@ -50,6 +50,9 @@ ccc doctor
 # Check for updates
 ccc update
 
+# Remove ccc: ~/.ccc, saved keys, and the installer's PATH entry
+ccc uninstall
+
 # Show version
 ccc version
 ```

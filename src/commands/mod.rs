@@ -8,5 +8,6 @@ pub mod lite;
 pub mod models;
 pub mod permission;
 pub mod show;
+pub mod uninstall;
 pub mod update;
 pub mod version;

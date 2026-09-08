@@ -177,6 +177,32 @@ ccc version
 ccc completions powershell   # sinh shell completion
 ```
 
+## Gỡ cài đặt
+
+```bash
+ccc uninstall
+```
+
+Lệnh in ra những gì sắp xoá rồi hỏi xác nhận (mặc định là không). Nó xoá:
+
+- Thư mục `~/.ccc/` — binary `ccc`, thư mục `.claude` mẫu, và `keys.json`
+- **Toàn bộ key đã lưu** trong `keys.json` — không khôi phục được
+- Dòng PATH mà script cài đặt đã thêm (biến môi trường User trên Windows, dòng
+  `export PATH` trong `.zshrc`/`.bashrc`/`.profile` trên macOS/Linux)
+
+Nó **không** đụng vào:
+
+- Claude Code
+- Thư mục `.claude/` trong các project của bạn
+
+Nghĩa là sau khi gỡ `ccc`, các project vẫn chạy bình thường: key nằm sẵn trong
+`.claude/settings.local.json` và Claude Code đọc thẳng file đó, không cần `ccc`.
+Muốn xoá sạch key thì phải tự xoá file đó trong từng project.
+
+Trên Windows, `ccc.exe` đang chạy nên không tự xoá được ngay; lệnh xoá mọi thứ
+còn lại rồi hẹn xoá nốt thư mục vài giây sau khi tiến trình thoát. Nhớ khởi động
+lại terminal để PATH cập nhật.
+
 ## TUI quản lý key
 
 Chạy `ccc` không kèm lệnh, hoặc `ccc key`, sẽ mở giao diện toàn màn hình.

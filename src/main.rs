@@ -52,6 +52,8 @@ enum Commands {
     Permission,
     /// Check for updates and install latest version
     Update,
+    /// Remove ~/.ccc, the saved keys, and the installer's PATH entry
+    Uninstall,
     /// Check environment and config status
     Doctor,
     /// Test API connection with current key
@@ -77,6 +79,7 @@ fn main() -> Result<()> {
         Some(Commands::Config { subcmd }) => commands::config::run(subcmd)?,
         Some(Commands::Permission) => commands::permission::run()?,
         Some(Commands::Update) => commands::update::run()?,
+        Some(Commands::Uninstall) => commands::uninstall::run()?,
         Some(Commands::Doctor) => commands::doctor::run()?,
         Some(Commands::Check) => commands::check::run()?,
         Some(Commands::Models) => commands::models::run()?,

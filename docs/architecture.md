@@ -26,6 +26,7 @@ ccc/
 │   │   ├── permission.rs       `ccc permission`
 │   │   ├── show.rs             `ccc show`
 │   │   ├── update.rs           `ccc update`
+│   │   ├── uninstall.rs        `ccc uninstall`
 │   │   ├── version.rs          `ccc version`
 │   │   └── completions.rs      `ccc completions`
 │   │
