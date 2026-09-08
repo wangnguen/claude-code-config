@@ -16,8 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # Not --locked: the bump step rewrites Cargo.toml's version without
-      # touching Cargo.lock, so the two are routinely out of sync.
       - run: cargo check --all-targets
 
   bump-and-release:
@@ -50,16 +48,21 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
-      - name: Update Cargo.toml version
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Update version in Cargo.toml and Cargo.lock
         run: |
           sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.version }}\"/" Cargo.toml
+          # -w touches only the workspace member's entry, so dependency
+          # versions stay exactly as they were resolved before.
+          cargo update -w
           cat Cargo.toml
 
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml
+          git add Cargo.toml Cargo.lock
           git diff --cached --quiet && echo "No changes" || git commit -m "bump v${{ steps.bump.outputs.version }}"
           git push origin main
 

@@ -224,7 +224,7 @@ Mỗi lần push lên `main`:
         ↓
 2. Job "bump-and-release"
    ├─ Đọc tag mới nhất, tăng số patch (0.1.26 → 0.1.27)
-   ├─ Sửa version trong Cargo.toml
+   ├─ Sửa version trong Cargo.toml, rồi `cargo update -w` để Cargo.lock khớp theo
    ├─ Commit "bump v0.1.27" và push lên main
    └─ Tạo tag v0.1.27
         ↓
@@ -244,9 +244,19 @@ kích hoạt lại workflow gây vòng lặp vô hạn.
 
 Version **không** được sửa bằng tay trong `Cargo.toml` — CI tự tăng.
 
-`Cargo.lock` sẽ lệch version so với `Cargo.toml` sau mỗi lần bump, vì bước bump
-chỉ sửa `Cargo.toml`. Đó là lý do CI chạy `cargo check` mà không dùng cờ
-`--locked`.
+Bước bump commit cả `Cargo.toml` lẫn `Cargo.lock`, nên sau khi `git pull` hai
+file luôn khớp version. Nếu bạn lỡ sửa version bằng tay (hoặc thêm/bớt
+dependency), đồng bộ lại lock trước khi commit để cây làm việc không bẩn:
+
+```bash
+cargo update -w          # chỉ cập nhật entry của chính crate ccc
+```
+
+Không có toolchain Rust chạy được trên máy thì dùng Docker với image có sẵn:
+
+```bash
+docker run --rm -v "${PWD}:/app" -w /app rust:1.98 cargo update -w
+```
 
 ## Danh sách kiểm tra trước khi commit
 
