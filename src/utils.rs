@@ -5,6 +5,8 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 
+use crate::config::SETTINGS_FILE;
+
 /// Read a secret without echoing it to the terminal.
 pub fn prompt_secret(message: &str) -> Result<String> {
     let value = Password::with_theme(&ColorfulTheme::default())
@@ -15,23 +17,31 @@ pub fn prompt_secret(message: &str) -> Result<String> {
     Ok(value.trim().to_string())
 }
 
-/// Make sure the project's .gitignore covers .claude/, which now holds a
-/// virtual API key. No-op when there is no .gitignore or it already covers it.
-pub fn ignore_claude_dir() {
+/// Make sure the project's .gitignore covers .claude/settings.local.json,
+/// which now holds a virtual API key. Only that one file is ignored — not the
+/// whole .claude/ folder — because a project may already commit
+/// .claude/settings.json, skills/, commands/, etc. and those must stay tracked.
+/// No-op when there is no .gitignore, or when the file is already covered
+/// (by its own entry, or by a broader .claude/ entry someone added before).
+pub fn ignore_local_settings() {
     let path = Path::new(".gitignore");
     // Only touch git repos; elsewhere a stray .gitignore would be noise.
     if !path.exists() && !Path::new(".git").exists() {
         return;
     }
+    let target = format!(".claude/{SETTINGS_FILE}");
     let content = fs::read_to_string(path).unwrap_or_default();
-    if content.lines().any(|l| {
-        matches!(l.trim(), ".claude/" | ".claude" | "/.claude/" | "/.claude")
-    }) {
+    let already_ignored = content.lines().any(|line| {
+        // `/x`, `**/x` and `x` all match the same file at the repo root.
+        let entry = line.trim().trim_start_matches("**/").trim_start_matches('/');
+        entry == target || matches!(entry, ".claude/" | ".claude")
+    });
+    if already_ignored {
         return;
     }
     let sep = if content.ends_with('\n') { "" } else { "\n" };
-    if fs::write(path, format!("{content}{sep}.claude/\n")).is_ok() {
-        println!("Added '.claude/' to .gitignore (it now contains your key).");
+    if fs::write(path, format!("{content}{sep}{target}\n")).is_ok() {
+        println!("Added '{target}' to .gitignore (it now contains your key).");
     }
 }
 

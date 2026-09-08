@@ -61,7 +61,7 @@ pub fn run() -> Result<()> {
     env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = serde_json::Value::String(LITE_DEFAULT_HAIKU_MODEL.to_string());
     write_json(&target_settings, &json)?;
 
-    crate::utils::ignore_claude_dir();
+    crate::utils::ignore_local_settings();
 
     println!("Copied default .claude config to current directory.");
     println!("Applied lite config (base_url: {LITE_BASE_URL}).");

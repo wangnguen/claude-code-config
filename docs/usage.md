@@ -100,7 +100,7 @@ Lệnh này sẽ:
 2. Copy thư mục `.claude/` mẫu vào project
 3. Ghi `.claude/settings.local.json` với base URL của LiteLLM, key của bạn, bật
    model discovery, và pin sẵn 5 biến model sang tên `-vn`
-4. Thêm `.claude/` vào `.gitignore` nếu project là git repo
+4. Thêm `.claude/settings.local.json` vào `.gitignore` nếu project là git repo
 
 Sau đó kiểm tra:
 
@@ -235,6 +235,10 @@ Gateway có thể liệt kê nhiều model hơn số model key bạn được ph
 - **Không gửi virtual key qua chat**, không commit vào source dùng chung.
 - `ccc lite` nhập key ở chế độ ẩn, key không nằm lại trong lịch sử terminal.
 - `ccc show` và `ccc config list` che key trước khi in, an toàn khi share màn hình.
-- `ccc init` / `ccc lite` / `ccc key use` tự thêm `.claude/` vào `.gitignore`.
+- `ccc init` / `ccc lite` / `ccc key use` tự thêm `.claude/settings.local.json`
+  vào `.gitignore` — chỉ đúng file chứa key, không ignore cả thư mục `.claude/`,
+  để `settings.json`, `skills/`, `commands/` của project vẫn commit được như
+  bình thường. Nếu `.gitignore` đã có sẵn dòng đó (hoặc đã ignore cả `.claude/`)
+  thì `ccc` không ghi thêm gì.
 - Key được lưu dạng plaintext trong `~/.ccc/keys.json`. File này chỉ nằm trên
   máy bạn, nhưng đừng đồng bộ nó lên cloud storage dùng chung.

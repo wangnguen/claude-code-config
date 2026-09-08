@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::config::{
     default_claude_dir, read_json, set_auth_token, write_json, KeysStore, SETTINGS_FILE,
 };
-use crate::utils::{confirm, copy_dir_recursive, ignore_claude_dir};
+use crate::utils::{confirm, copy_dir_recursive, ignore_local_settings};
 
 pub fn run() -> Result<()> {
     let source = default_claude_dir()?;
@@ -32,7 +32,7 @@ pub fn run() -> Result<()> {
             set_auth_token(&mut json, key_value);
             write_json(&target_settings, &json)?;
             println!("Applied default key '{}' to local config.", store.active.as_deref().unwrap_or(""));
-            ignore_claude_dir();
+            ignore_local_settings();
         }
     } else {
         println!("No API key found. Run 'ccc key add' to add one, then 'ccc key use' to apply.");

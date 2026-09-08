@@ -4,7 +4,7 @@ use dialoguer::theme::ColorfulTheme;
 
 use crate::api::{check_api_key, get_api_config, validate_key_format};
 use crate::config::{local_settings_path, read_json_or_default, set_auth_token, write_json, KeysStore};
-use crate::utils::{ignore_claude_dir, mask_key};
+use crate::utils::{ignore_local_settings, mask_key};
 
 pub fn run(subcmd: Option<KeyCmd>) -> Result<()> {
     match subcmd {
@@ -213,7 +213,7 @@ fn cmd_use(name: Option<String>) -> Result<()> {
 
     set_auth_token(&mut json, key_value);
     write_json(&local_path, &json)?;
-    ignore_claude_dir();
+    ignore_local_settings();
 
     let folder = std::env::current_dir()
         .map(|p| p.display().to_string())

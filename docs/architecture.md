@@ -121,7 +121,8 @@ nhau.
        - CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1"
        - 5 biến model, tất cả đều là tên -vn
        ↓
-6. Thêm ".claude/" vào .gitignore nếu là git repo
+6. Thêm ".claude/settings.local.json" vào .gitignore nếu là git repo
+   (bỏ qua nếu .gitignore đã che file đó, hoặc đã che cả .claude/)
 ```
 
 Bước 5 phải pin **đủ cả 5 biến model**. Bỏ trống biến nào thì Claude Code rơi về
