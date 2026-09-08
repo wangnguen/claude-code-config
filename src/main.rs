@@ -6,7 +6,7 @@ mod ui;
 mod utils;
 
 use anyhow::Result;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 
 #[derive(Parser)]

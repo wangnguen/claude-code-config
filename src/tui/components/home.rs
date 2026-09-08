@@ -100,7 +100,7 @@ impl HomeDashboard {
             .bottom_margin(1);
 
         let rows: Vec<Row> = commands.iter().enumerate().map(|(i, (cmd, desc, color))| {
-            let bg = if i % 2 == 0 { PANEL_BG } else { Color::Rgb(25, 25, 40) };
+            let bg = if i % 2 == 0 { PANEL_BG } else { ROW_ALT };
             Row::new(vec![
                 Cell::from(Span::raw(format!("  {}", cmd)).style(Style::default().fg(*color).bold())),
                 Cell::from(Span::raw(*desc)).style(Style::default().fg(TEXT)),

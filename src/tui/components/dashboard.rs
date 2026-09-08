@@ -10,8 +10,6 @@ pub struct Dashboard {
     pub active_key_masked: Option<String>,
     pub api_url: String,
     pub model: String,
-    pub ok_count: usize,
-    pub fail_count: usize,
 }
 
 impl Dashboard {
@@ -29,8 +27,6 @@ impl Dashboard {
             active_key_masked,
             api_url,
             model,
-            ok_count: 0,
-            fail_count: 0,
         }
     }
 
@@ -193,7 +189,7 @@ impl Dashboard {
             .enumerate()
             .map(|(i, (name, value))| {
                 let is_active = store.active.as_deref() == Some(name.as_str());
-                let bg = if i % 2 == 0 { PANEL_BG } else { Color::Rgb(25, 25, 40) };
+                let bg = if i % 2 == 0 { PANEL_BG } else { ROW_ALT };
                 Row::new(vec![
                     Cell::from(if is_active { " ▶ " } else { "   " }).style(Style::default().fg(ACCENT)),
                     Cell::from(format!("  {}{}", name, if is_active { " ★" } else { "" })).style(Style::default().fg(if is_active { Color::White } else { TEXT })),
