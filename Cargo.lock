@@ -187,6 +187,7 @@ dependencies = [
  "crossterm",
  "dialoguer",
  "indicatif",
+ "libc",
  "ratatui",
  "serde",
  "serde_json",

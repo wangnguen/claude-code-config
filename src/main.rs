@@ -67,7 +67,19 @@ enum Commands {
     },
 }
 
+/// Rust starts with SIGPIPE ignored, so `ccc models | head` turns a closed pipe
+/// into "failed printing to stdout" and a panic trace. Handing the signal back
+/// to the OS makes ccc exit quietly like every other command in a pipeline.
+#[cfg(unix)]
+fn restore_sigpipe() {
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+}
+
+#[cfg(not(unix))]
+fn restore_sigpipe() {}
+
 fn main() -> Result<()> {
+    restore_sigpipe();
     let cli = Cli::parse();
 
     match cli.command {
