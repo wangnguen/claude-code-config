@@ -1,6 +1,6 @@
 [package]
 name = "ccc"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "Claude Code Config CLI"
 
