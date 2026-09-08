@@ -25,6 +25,8 @@ ccc/
 │   │   ├── doctor.rs           `ccc doctor`
 │   │   ├── permission.rs       `ccc permission`
 │   │   ├── show.rs             `ccc show`
+│   │   ├── shell.rs            `ccc` không tham số: vòng lặp tương tác
+│   │   ├── splash.rs           Banner + danh sách lệnh của shell
 │   │   ├── update.rs           `ccc update`
 │   │   ├── uninstall.rs        `ccc uninstall`
 │   │   ├── version.rs          `ccc version`

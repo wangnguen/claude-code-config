@@ -83,6 +83,16 @@ pub fn print_separator() {
     rule('├', '┤');
 }
 
+/// A plain divider, for screens that are not boxed.
+pub fn print_rule() {
+    println!("  {}", style("─".repeat(width())).dim());
+}
+
+/// Status line under a divider: what to type next, kept out of the way.
+pub fn print_hint(text: &str) {
+    println!("  {}", style(text).dim());
+}
+
 pub fn print_footer() {
     rule('╰', '╯');
 }
@@ -263,16 +273,97 @@ fn mark_lines() -> Vec<String> {
         .collect()
 }
 
+/// The wordmark plus the caption lines under it, as one block.
+fn brand_lines(caption: &str, details: &[&str]) -> Vec<String> {
+    let mut lines = mark_lines();
+    lines.push(style(caption).dim().to_string());
+    lines.extend(details.iter().map(|d| style(d).dim().to_string()));
+    lines
+}
+
 /// The wordmark, with the caption lines under it the way a splash screen reads:
 /// what this is, then the one setting worth knowing.
 pub fn print_brand(caption: &str, details: &[&str]) {
-    for line in mark_lines() {
+    for line in brand_lines(caption, details) {
         println!("  {line}");
     }
-    println!("  {}", style(caption).dim());
-    for detail in details {
-        println!("  {}", style(detail).dim());
+}
+
+/// A bordered list whose section titles sit in the border itself, so a group of
+/// commands costs one line instead of a blank line plus a heading.
+fn menu_box(sections: &[(&str, &[&str])]) -> Vec<String> {
+    let entry = |item: &str| format!("  {} {item}", style("›").cyan());
+    let inner = sections
+        .iter()
+        .flat_map(|(title, items)| {
+            items
+                .iter()
+                .map(|i| i.len() + 5)
+                .chain(std::iter::once(title.len() + 3))
+        })
+        .max()
+        .unwrap_or(24);
+
+    let titled = |title: &str, left: char, right: char| {
+        let label = format!(" {} ", style(title).cyan().bold());
+        let fill = inner.saturating_sub(measure_text_width(&label));
+        format!(
+            "{}{label}{}{}",
+            style(left).dim(),
+            style("─".repeat(fill)).dim(),
+            style(right).dim()
+        )
+    };
+
+    let mut lines = Vec::new();
+    for (index, (title, items)) in sections.iter().enumerate() {
+        let (left, right) = if index == 0 {
+            ('┌', '┐')
+        } else {
+            ('├', '┤')
+        };
+        lines.push(titled(title, left, right));
+        for item in *items {
+            lines.push(format!(
+                "{}{}{}",
+                style('│').dim(),
+                pad(&entry(item), inner),
+                style('│').dim()
+            ));
+        }
     }
+    lines.push(format!(
+        "{}{}{}",
+        style('└').dim(),
+        style("─".repeat(inner)).dim(),
+        style('┘').dim()
+    ));
+    lines
+}
+
+/// Splash screen: wordmark on the left, what you can run on the right.
+pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[&str])]) {
+    let left = brand_lines(caption, details);
+    let right = menu_box(sections);
+    // The widest line on the left decides the column, so a long model name
+    // cannot shove the box sideways on one row and not the others.
+    let column = left
+        .iter()
+        .map(|l| measure_text_width(l))
+        .max()
+        .unwrap_or(0)
+        .max(mark_width());
+
+    println!();
+    for i in 0..left.len().max(right.len()) {
+        match (left.get(i), right.get(i)) {
+            (Some(l), Some(r)) => println!("  {}   {r}", pad(l, column)),
+            (Some(l), None) => println!("  {l}"),
+            (None, Some(r)) => println!("  {}   {r}", " ".repeat(column)),
+            (None, None) => break,
+        }
+    }
+    println!();
 }
 
 // ── Spinner ──

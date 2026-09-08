@@ -23,6 +23,9 @@ Download binary from [Releases](https://github.com/wangnguen/claude-code-config/
 ## Usage
 
 ```bash
+# Interactive shell: type commands without the `ccc` prefix
+ccc
+
 # Set up this project against the LiteLLM gateway (prompts for your virtual key)
 ccc lite
 

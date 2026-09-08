@@ -25,7 +25,7 @@ pub enum ShowTarget {
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Commands {
     /// Show the current version
     Version,
     /// Copy default .claude config to current directory
@@ -78,25 +78,35 @@ fn restore_sigpipe() {
 #[cfg(not(unix))]
 fn restore_sigpipe() {}
 
+/// Run one parsed command. Separate from main so the interactive shell can send
+/// the lines people type through exactly the same path as the command line.
+pub fn dispatch(command: Commands) -> Result<()> {
+    match command {
+        Commands::Version => commands::version::run(),
+        Commands::Init => commands::init::run()?,
+        Commands::Lite => commands::lite::run()?,
+        Commands::Show { target } => commands::show::run(target.unwrap_or(ShowTarget::Global))?,
+        Commands::Key { subcmd } => commands::key::run(subcmd)?,
+        Commands::Config { subcmd } => commands::config::run(subcmd)?,
+        Commands::Permission => commands::permission::run()?,
+        Commands::Update => commands::update::run()?,
+        Commands::Uninstall => commands::uninstall::run()?,
+        Commands::Doctor => commands::doctor::run()?,
+        Commands::Check => commands::check::run()?,
+        Commands::Models => commands::models::run()?,
+        Commands::Completions { shell } => commands::completions::run(shell),
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     restore_sigpipe();
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Version) => commands::version::run(),
-        Some(Commands::Init) => commands::init::run()?,
-        Some(Commands::Lite) => commands::lite::run()?,
-        Some(Commands::Show { target }) => commands::show::run(target.unwrap_or(ShowTarget::Global))?,
-        Some(Commands::Key { subcmd }) => commands::key::run(subcmd)?,
-        Some(Commands::Config { subcmd }) => commands::config::run(subcmd)?,
-        Some(Commands::Permission) => commands::permission::run()?,
-        Some(Commands::Update) => commands::update::run()?,
-        Some(Commands::Uninstall) => commands::uninstall::run()?,
-        Some(Commands::Doctor) => commands::doctor::run()?,
-        Some(Commands::Check) => commands::check::run()?,
-        Some(Commands::Models) => commands::models::run()?,
-        Some(Commands::Completions { shell }) => commands::completions::run(shell),
-        None => tui::run_key_tui(),
+        Some(command) => dispatch(command)?,
+        // The key manager still lives at `ccc key`; a bare `ccc` opens the shell.
+        None => commands::shell::run()?,
     }
 
     Ok(())

@@ -111,6 +111,28 @@ ccc check
 Tất cả phải pass. Rồi khởi động lại Claude Code và mở `/model` — phải thấy các
 model `-vn` với nhãn "From gateway".
 
+## Chế độ tương tác
+
+Gõ `ccc` không kèm lệnh sẽ mở dấu nhắc tương tác: banner ở trên, danh sách lệnh
+hay dùng bên phải, rồi vòng lặp `›` để gõ lệnh mà không cần lặp lại `ccc`.
+
+```
+  › check
+  › doctor
+  › key use work
+  › exit
+```
+
+Bên trong đó:
+
+- Gõ tên lệnh trần (`check`) hoặc kèm tiền tố quen tay (`ccc check`) đều được
+- `?` in lại danh sách lệnh, `help` liệt kê **toàn bộ** lệnh
+- `exit` / `quit` / `q` hoặc Ctrl-D để thoát
+- Lệnh gõ sai được clap báo lỗi ngay tại chỗ, không làm thoát phiên
+
+Mọi lệnh chạy trong đây đi qua đúng bộ phân tích tham số của dòng lệnh, nên
+không có chuyện một lệnh cư xử khác nhau giữa hai chế độ.
+
 ## Các lệnh
 
 ### Thiết lập
@@ -205,7 +227,8 @@ lại terminal để PATH cập nhật.
 
 ## TUI quản lý key
 
-Chạy `ccc` không kèm lệnh, hoặc `ccc key`, sẽ mở giao diện toàn màn hình.
+Chạy `ccc key` không kèm lệnh con sẽ mở giao diện toàn màn hình. (`ccc` trơn
+không mở TUI nữa — xem mục [Chế độ tương tác](#chế-độ-tương-tác) bên dưới.)
 
 | Phím | Hành động |
 |---|---|
