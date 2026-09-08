@@ -165,14 +165,14 @@ const GLYPH: [&str; 14] = [
 
 const GLYPH_GAP: usize = 2;
 
-/// Top-to-bottom stops. The letters start almost lost in the background and
-/// resolve into warm cream at the base, so the wordmark reads as rising out of
-/// the terminal rather than sitting on it.
+/// Top-to-bottom stops. Every one of them has to stay legible on its own: a
+/// stop dark enough to "fade into" the background disappears on dark themes
+/// and muddies the letters on light ones.
 const FADE: [(u8, u8, u8); 4] = [
-    (58, 52, 110),
-    (98, 84, 190),
-    (214, 126, 92),
-    (245, 230, 211),
+    (91, 206, 240),
+    (129, 178, 246),
+    (167, 139, 250),
+    (244, 226, 205),
 ];
 
 /// Sideways tint mixed into the fade, to keep the three letters from reading as
@@ -193,7 +193,7 @@ fn pixel_colour(x: usize, y: usize, width: usize, height: usize) -> (u8, u8, u8)
     let fade = sample(&FADE, y as f32 / (height - 1) as f32);
     let tint = sample(&TINT, x as f32 / (width - 1) as f32);
     // Enough tint to separate the letters, not enough to fight the fade.
-    let mix = |a: u8, b: u8| (a as f32 * 0.72 + b as f32 * 0.28).round() as u8;
+    let mix = |a: u8, b: u8| (a as f32 * 0.85 + b as f32 * 0.15).round() as u8;
     (
         mix(fade.0, tint.0),
         mix(fade.1, tint.1),
@@ -234,6 +234,12 @@ fn mark_lines() -> Vec<String> {
             for x in 0..end {
                 let (top_ink, bottom_ink) = (inked(&top, x), inked(&bottom, x));
                 if !top_ink && !bottom_ink {
+                    // Reset the background first: without this the blank
+                    // inherits the previous cell's background and floods the
+                    // counters of the letters with colour.
+                    if coloured {
+                        line.push_str("\x1b[49m");
+                    }
                     line.push(' ');
                     continue;
                 }
@@ -276,7 +282,9 @@ fn mark_lines() -> Vec<String> {
 /// The wordmark plus the caption lines under it, as one block.
 fn brand_lines(caption: &str, details: &[&str]) -> Vec<String> {
     let mut lines = mark_lines();
-    lines.push(style(caption).dim().to_string());
+    // The name keeps the terminal's own foreground colour: it is the one line
+    // that has to stay readable on a light theme as well as a dark one.
+    lines.push(caption.to_string());
     lines.extend(details.iter().map(|d| style(d).dim().to_string()));
     lines
 }
