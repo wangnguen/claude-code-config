@@ -1,5 +1,6 @@
-use console::{style, Emoji};
+use console::{colors_enabled, measure_text_width, style, truncate_str, Emoji, Term};
 use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::OnceLock;
 
 // ── Cross-platform icons ──
 
@@ -8,48 +9,117 @@ pub static ICON_FAIL:  Emoji = Emoji("❌", "[X]");
 pub static ICON_SEARCH:Emoji = Emoji("🔍", "(?)");
 pub static ICON_DOC:   Emoji = Emoji("📋", "(i)");
 
+/// Column the value/detail starts at, counted from the box's inner edge.
+const LABEL_WIDTH: usize = 16;
+/// Widest icon cell: "[OK]" in the ASCII fallback, two columns as an emoji.
+const ICON_WIDTH: usize = 4;
+
 // ── Box drawing ──
+//
+// Every line is padded by display width, never by byte or char count: colours
+// add invisible ANSI bytes, an emoji icon takes two columns while its ASCII
+// fallback takes three or four, and a path can be longer than the whole box.
+// Measuring what the terminal will actually show is the only way the right
+// border lands in the same column on every line.
+
+/// Interior width of the box, fixed for the whole run so consecutive lines
+/// cannot disagree even if the window is resized mid-command.
+fn width() -> usize {
+    static WIDTH: OnceLock<usize> = OnceLock::new();
+    *WIDTH.get_or_init(|| {
+        let columns = Term::stdout().size().1 as usize;
+        // 4 columns go to the indent and the two borders.
+        columns.saturating_sub(4).clamp(50, 88)
+    })
+}
+
+fn rule(left: char, right: char) {
+    println!("  {left}{}{right}", "─".repeat(width()));
+}
+
+/// One row of the box, trimmed or padded to exactly the interior width.
+fn row(content: &str) {
+    let inner = width();
+    println!("  │{}│", pad(&truncate_str(content, inner, "…"), inner));
+}
+
+/// Append spaces until `text` occupies `columns` display columns.
+fn pad(text: &str, columns: usize) -> String {
+    let visible = measure_text_width(text);
+    format!("{text}{}", " ".repeat(columns.saturating_sub(visible)))
+}
+
+/// Shorten from the middle: for a path the file name at the end identifies it
+/// as much as the drive at the start, so cutting the tail off loses the most.
+fn shorten(text: &str, columns: usize) -> String {
+    if measure_text_width(text) <= columns {
+        return text.to_string();
+    }
+    if columns <= 1 {
+        return "…".to_string();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let keep = columns - 1;
+    let head = (keep - keep * 2 / 3).min(chars.len());
+    let tail = (keep * 2 / 3).min(chars.len() - head);
+    let start: String = chars[..head].iter().collect();
+    let end: String = chars[chars.len() - tail..].iter().collect();
+    format!("{start}…{end}")
+}
+
+/// A label column plus whatever room is left for the value.
+fn labelled(head: &str, value: &str) -> String {
+    let room = width().saturating_sub(measure_text_width(head));
+    format!("{head}{}", shorten(value, room))
+}
 
 pub fn print_header(icon: &Emoji, title: &str) {
-    let width = 50;
-    let border: String = "─".repeat(width);
-    println!("  ╭{border}╮");
-    println!("  │  {} {:<w$}│", icon, style(title).cyan().bold(), w = width - 4);
-    println!("  ├{border}┤");
+    rule('╭', '╮');
+    row(&format!("  {icon} {}", style(title).cyan().bold()));
+    rule('├', '┤');
 }
 
 pub fn print_separator() {
-    let border: String = "─".repeat(50);
-    println!("  ├{border}┤");
+    rule('├', '┤');
 }
 
 pub fn print_footer() {
-    let border: String = "─".repeat(50);
-    println!("  ╰{border}╯");
+    rule('╰', '╯');
 }
 
 pub fn print_row(label: &str, value: &str) {
-    println!("  │  {:<12} {:<w$}│", style(label).dim(), value, w = 50 - 15);
+    let head = format!("  {} ", pad(&style(label).dim().to_string(), LABEL_WIDTH));
+    row(&labelled(&head, value));
 }
 
 pub fn print_check(ok: bool, label: &str, detail: &str) {
     let icon = if ok { &ICON_OK } else { &ICON_FAIL };
-    let styled_label = if ok {
+    let label = if ok {
         style(label).green().to_string()
     } else {
         style(label).red().to_string()
     };
-    let detail_styled = if ok {
-        style(detail).to_string()
+    // The icon gets a fixed cell: "[X]" is one column narrower than "[OK]",
+    // which would otherwise shift the label column row by row.
+    let head = format!(
+        "  {} {} ",
+        pad(&icon.to_string(), ICON_WIDTH),
+        pad(&label, LABEL_WIDTH)
+    );
+
+    let room = width().saturating_sub(measure_text_width(&head));
+    let detail = shorten(detail, room);
+    let detail = if ok {
+        detail
     } else {
         style(detail).red().to_string()
     };
-    println!("  │  {} {:<16} {:<w$}│", icon, styled_label, detail_styled, w = 50 - 21);
+    row(&format!("{head}{detail}"));
 }
 
 pub fn print_result_line(pass: usize, fail: usize) {
     let total = pass + fail;
-    let result_text = if fail == 0 {
+    let result = if fail == 0 {
         style(format!("All {total} checks passed")).green().bold().to_string()
     } else {
         format!(
@@ -58,7 +128,151 @@ pub fn print_result_line(pass: usize, fail: usize) {
             style(format!("{fail} failed")).red().bold(),
         )
     };
-    println!("  │  {:<w$}│", result_text, w = 50 - 2);
+    row(&format!("  {result}"));
+}
+
+// ── Brand mark ──
+
+/// One letter of the wordmark, '#' being ink. Three of these side by side make
+/// "ccc"; two pixel rows share a terminal line as half blocks, so the fourteen
+/// rows below print as seven lines.
+const GLYPH: [&str; 14] = [
+    "  #####  ",
+    " ####### ",
+    "###   ###",
+    "###    ##",
+    "###      ",
+    "###      ",
+    "###      ",
+    "###      ",
+    "###      ",
+    "###      ",
+    "###    ##",
+    "###   ###",
+    " ####### ",
+    "  #####  ",
+];
+
+const GLYPH_GAP: usize = 2;
+
+/// Top-to-bottom stops. The letters start almost lost in the background and
+/// resolve into warm cream at the base, so the wordmark reads as rising out of
+/// the terminal rather than sitting on it.
+const FADE: [(u8, u8, u8); 4] = [
+    (58, 52, 110),
+    (98, 84, 190),
+    (214, 126, 92),
+    (245, 230, 211),
+];
+
+/// Sideways tint mixed into the fade, to keep the three letters from reading as
+/// one flat block.
+const TINT: [(u8, u8, u8); 3] = [(91, 214, 240), (74, 144, 226), (138, 123, 240)];
+
+fn sample(stops: &[(u8, u8, u8)], t: f32) -> (u8, u8, u8) {
+    let segments = stops.len() - 1;
+    let span = 1.0 / segments as f32;
+    let index = ((t / span) as usize).min(segments - 1);
+    let local = ((t - index as f32 * span) / span).clamp(0.0, 1.0);
+    let (from, to) = (stops[index], stops[index + 1]);
+    let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * local).round() as u8;
+    (mix(from.0, to.0), mix(from.1, to.1), mix(from.2, to.2))
+}
+
+fn pixel_colour(x: usize, y: usize, width: usize, height: usize) -> (u8, u8, u8) {
+    let fade = sample(&FADE, y as f32 / (height - 1) as f32);
+    let tint = sample(&TINT, x as f32 / (width - 1) as f32);
+    // Enough tint to separate the letters, not enough to fight the fade.
+    let mix = |a: u8, b: u8| (a as f32 * 0.72 + b as f32 * 0.28).round() as u8;
+    (
+        mix(fade.0, tint.0),
+        mix(fade.1, tint.1),
+        mix(fade.2, tint.2),
+    )
+}
+
+fn mark_rows() -> Vec<String> {
+    let gap = " ".repeat(GLYPH_GAP);
+    GLYPH
+        .iter()
+        .map(|row| [*row, *row, *row].join(&gap))
+        .collect()
+}
+
+fn mark_width() -> usize {
+    GLYPH[0].len() * 3 + GLYPH_GAP * 2
+}
+
+fn mark_lines() -> Vec<String> {
+    let rows = mark_rows();
+    let (width, height) = (mark_width(), rows.len());
+    let coloured = colors_enabled();
+
+    rows.chunks(2)
+        .enumerate()
+        .map(|(line_index, pair)| {
+            let top: Vec<char> = pair[0].chars().collect();
+            let bottom: Vec<char> = pair[1].chars().collect();
+            let inked = |row: &Vec<char>, x: usize| row.get(x).is_some_and(|c| *c == '#');
+            // Stop at the last inked column so no line carries trailing blanks.
+            let end = (0..width)
+                .rev()
+                .find(|&x| inked(&top, x) || inked(&bottom, x))
+                .map_or(0, |x| x + 1);
+
+            let mut line = String::new();
+            for x in 0..end {
+                let (top_ink, bottom_ink) = (inked(&top, x), inked(&bottom, x));
+                if !top_ink && !bottom_ink {
+                    line.push(' ');
+                    continue;
+                }
+                if !coloured {
+                    line.push(match (top_ink, bottom_ink) {
+                        (true, true) => '█',
+                        (true, false) => '▀',
+                        _ => '▄',
+                    });
+                    continue;
+                }
+                // Upper and lower halves sit on different rows of the fade, so
+                // each carries its own colour: foreground paints the top half,
+                // background the bottom.
+                let (y_top, y_bottom) = (line_index * 2, line_index * 2 + 1);
+                match (top_ink, bottom_ink) {
+                    (true, true) => {
+                        let (r, g, b) = pixel_colour(x, y_top, width, height);
+                        let (br, bg, bb) = pixel_colour(x, y_bottom, width, height);
+                        line.push_str(&format!("\x1b[38;2;{r};{g};{b}m\x1b[48;2;{br};{bg};{bb}m▀"));
+                    }
+                    (true, false) => {
+                        let (r, g, b) = pixel_colour(x, y_top, width, height);
+                        line.push_str(&format!("\x1b[49m\x1b[38;2;{r};{g};{b}m▀"));
+                    }
+                    _ => {
+                        let (r, g, b) = pixel_colour(x, y_bottom, width, height);
+                        line.push_str(&format!("\x1b[49m\x1b[38;2;{r};{g};{b}m▄"));
+                    }
+                }
+            }
+            if coloured {
+                line.push_str("\x1b[0m");
+            }
+            line
+        })
+        .collect()
+}
+
+/// The wordmark, with the caption lines under it the way a splash screen reads:
+/// what this is, then the one setting worth knowing.
+pub fn print_brand(caption: &str, details: &[&str]) {
+    for line in mark_lines() {
+        println!("  {line}");
+    }
+    println!("  {}", style(caption).dim());
+    for detail in details {
+        println!("  {}", style(detail).dim());
+    }
 }
 
 // ── Spinner ──
