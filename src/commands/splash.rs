@@ -19,5 +19,14 @@ pub fn print() {
         SECTIONS,
     );
     ui::print_rule();
-    ui::print_hint("? for this list · help for every command · exit to leave");
+    ui::print_hint("? for this list · help for every command · clear to tidy up · exit to leave");
+}
+
+/// Sign-off for the interactive shell, Ctrl-C included: a prompt that simply
+/// stops answering reads like a crash, one line saying we meant to stop does
+/// not.
+pub fn print_farewell() {
+    ui::print_rule();
+    ui::print_hint("Goodbye · run ccc any time");
+    println!();
 }

@@ -120,6 +120,7 @@ hay dùng bên phải, rồi vòng lặp `›` để gõ lệnh mà không cần
   › check
   › doctor
   › key use work
+  › clear
   › exit
 ```
 
@@ -127,7 +128,12 @@ Bên trong đó:
 
 - Gõ tên lệnh trần (`check`) hoặc kèm tiền tố quen tay (`ccc check`) đều được
 - `?` in lại danh sách lệnh, `help` liệt kê **toàn bộ** lệnh
-- `exit` / `quit` / `q` hoặc Ctrl-D để thoát
+- `clear` (hoặc `/clear`, `cls`, Ctrl-L) dọn màn hình **cùng cả scrollback**, rồi
+  in lại banner. Ctrl-L giữ nguyên dòng đang gõ, `clear` thì không
+- `exit` / `quit` / `q`, Ctrl-D trên dòng trống, hoặc Ctrl-C để thoát — cả ba
+  đường đều in một dòng chào tạm biệt, nên phiên không bao giờ tắt lặng lẽ như
+  vừa crash
+- Con trỏ đi được: ←/→, Home/End, Backspace/Delete, Ctrl-U xoá cả dòng
 - Lệnh gõ sai được clap báo lỗi ngay tại chỗ, không làm thoát phiên
 
 Mọi lệnh chạy trong đây đi qua đúng bộ phân tích tham số của dòng lệnh, nên
