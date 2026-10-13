@@ -40,7 +40,17 @@ fn rule(left: char, right: char) {
 /// One row of the box, trimmed or padded to exactly the interior width.
 fn row(content: &str) {
     let inner = width();
-    println!("  │{}│", pad(&truncate_str(content, inner, "…"), inner));
+    println!("  │{}│", pad(&fit(content, inner), inner));
+}
+
+/// `truncate_str` cuts any text that reaches the full width, even when it
+/// fits exactly, turning a last character into "…". Only cut what overflows.
+fn fit(content: &str, columns: usize) -> String {
+    if measure_text_width(content) <= columns {
+        content.to_string()
+    } else {
+        truncate_str(content, columns, "…").into_owned()
+    }
 }
 
 /// Append spaces until `text` occupies `columns` display columns.
