@@ -471,7 +471,12 @@ pub mod tests {
             "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-vn[1m]",
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-vn",
         }});
+        let active = crate::active::resolve(&crate::active::Sources::from_json(vec![(
+            crate::active::Origin::Local,
+            json.clone(),
+        )]));
         let project = ProjectState {
+            active,
             folder: r"C:\Users\someone\Desktop\a-project-with-a-rather-long-folder-name".into(),
             local_path: ".claude/settings.local.json".into(),
             has_local: with_keys,

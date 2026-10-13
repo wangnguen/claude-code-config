@@ -61,6 +61,9 @@ ccc permission   # or: ccc p
 # Check the key, model discovery, and every model slot against the gateway
 ccc check
 
+# The model Claude Code starts on in this folder, and why (no network)
+ccc models current
+
 # List the models your key can use, and which slots use them
 ccc models
 
@@ -110,6 +113,26 @@ for older versions, always equal to the Haiku slot.
 
 Only models the gateway lists for your key are offered, so a picked model
 cannot fail with a 403.
+
+### Which model is actually in use
+
+`ccc models current` (and the `Model` line on the splash, `ccc version` and the
+TUI Home screen) shows the model a new Claude Code session in this folder starts
+on, worked out the way Claude Code decides it:
+
+1. `ANTHROPIC_MODEL`, if any source sets it
+2. else the `model` setting, which `/model` saves in `~/.claude/settings.json`
+3. else `ANTHROPIC_DEFAULT_MODEL`
+4. else Claude Code's default, `opus`
+
+An alias such as `opus` or `sonnet[1m]` is then resolved through its slot. For
+each variable, a settings file beats your shell, and the files rank managed
+policy, `.claude/settings.local.json`, `.claude/settings.json`, then user
+settings. Because `ccc lite` writes `ANTHROPIC_MODEL`, a model saved with
+`/model` does not take effect in that folder; `ccc models current` says so.
+
+It reads files only. A `--model` flag or a `/model` switch inside a running
+session is not saved anywhere it can see — use `/status` in Claude Code for that.
 
 ## Gateway models (`-vn`)
 

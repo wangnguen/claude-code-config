@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
+use crate::active::{self, Active, Sources};
 use crate::api::{current_key_with_source, get_api_config, matches_filter, model_filter_for, KeySource};
 use crate::config::{local_settings_path, read_json_or_default, KeysStore, ENV_GATEWAY_DISCOVERY};
 use crate::slots::{self, SLOTS};
@@ -23,6 +24,9 @@ pub struct ProjectState {
     pub filter: String,
     pub discovery: bool,
     pub slots: [Option<String>; 5],
+    /// The model a new Claude Code session here starts on, across every
+    /// settings file and the shell.
+    pub active: Active,
 }
 
 impl ProjectState {
@@ -43,8 +47,10 @@ impl ProjectState {
         let folder = std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| ".".to_string());
+        let active = active::resolve(&Sources::load());
 
         ProjectState {
+            active,
             folder,
             local_path,
             has_local,

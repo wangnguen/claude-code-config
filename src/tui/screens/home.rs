@@ -167,25 +167,30 @@ fn render_status(frame: &mut Frame, area: Rect, snap: &Snapshot) {
         Span::styled(fit_middle(&project.base_url, gateway_room), Style::default().fg(TEXT)),
         Span::styled(format!(" · {rule}"), Style::default().fg(TEXT_DIM)),
     ];
+    // The model a new session here starts on; the slots are on the Models screen.
     let (ready, total) = project.slots_ready();
+    let active = &project.active;
+    let model = active.display();
     let models = if !project.has_local {
-        vec![Span::styled("not set here — open Models", Style::default().fg(WARNING))]
+        vec![
+            Span::styled(model, Style::default().fg(WARNING)),
+            Span::styled(" · not set up here — open Models", Style::default().fg(TEXT_DIM)),
+        ]
     } else {
         let colour = if ready == total { SUCCESS } else { WARNING };
-        vec![
-            Span::styled(format!("{ready}/{total} slots set"), Style::default().fg(colour)),
-            Span::styled(
-                format!(" · discovery {}", if project.discovery { "on" } else { "off" }),
-                Style::default().fg(TEXT_DIM),
-            ),
-        ]
+        let note = if ready == total {
+            format!(" · discovery {}", if project.discovery { "on" } else { "off" })
+        } else {
+            format!(" · {} slot(s) unusable", total - ready)
+        };
+        vec![Span::styled(model, Style::default().fg(colour)), Span::styled(note, Style::default().fg(TEXT_DIM))]
     };
 
     let lines = vec![
         widgets::row(" Folder", 9, vec![Span::styled(fit_middle(&project.folder, room), Style::default().fg(TEXT))], width),
         widgets::row(" Key", 9, key, width),
         widgets::row(" Gateway", 9, gateway, width),
-        widgets::row(" Models", 9, models, width),
+        widgets::row(" Model", 9, models, width),
     ];
     frame.render_widget(Paragraph::new(lines), inner);
 }

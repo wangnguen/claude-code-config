@@ -18,7 +18,7 @@ pub const ENV_GATEWAY_DISCOVERY: &str = "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOV
 /// Where Claude Code sends its requests.
 pub const ENV_BASE_URL: &str = "ANTHROPIC_BASE_URL";
 
-pub fn ccc_home() -> Result<PathBuf> {
+fn home_dir() -> Result<PathBuf> {
     let home = if cfg!(target_os = "windows") {
         std::env::var("USERPROFILE")
             .or_else(|_| std::env::var("HOME"))
@@ -27,7 +27,32 @@ pub fn ccc_home() -> Result<PathBuf> {
             .or_else(|_| std::env::var("USERPROFILE"))
     }
     .context("Cannot determine home directory (HOME or USERPROFILE not set)")?;
-    Ok(Path::new(&home).join(".ccc"))
+    Ok(PathBuf::from(home))
+}
+
+pub fn ccc_home() -> Result<PathBuf> {
+    Ok(home_dir()?.join(".ccc"))
+}
+
+/// Claude Code's own user settings, ~/.claude/settings.json, or the same file
+/// under CLAUDE_CONFIG_DIR when that moves Claude Code's home. `/model` saves
+/// its choice here.
+pub fn user_claude_settings_path() -> Option<PathBuf> {
+    match std::env::var("CLAUDE_CONFIG_DIR") {
+        Ok(dir) if !dir.trim().is_empty() => Some(PathBuf::from(dir.trim()).join("settings.json")),
+        _ => home_dir().ok().map(|home| home.join(".claude").join("settings.json")),
+    }
+}
+
+/// System-wide policy file, which outranks every other settings source.
+pub fn managed_settings_path() -> PathBuf {
+    PathBuf::from(if cfg!(target_os = "windows") {
+        r"C:\ProgramData\ClaudeCode\managed-settings.json"
+    } else if cfg!(target_os = "macos") {
+        "/Library/Application Support/ClaudeCode/managed-settings.json"
+    } else {
+        "/etc/claude-code/managed-settings.json"
+    })
 }
 
 pub fn default_claude_dir() -> Result<PathBuf> {

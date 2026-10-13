@@ -15,6 +15,7 @@ ccc/
 │   ├── checks.rs               Các bước của `ccc check` dưới dạng dữ liệu (CLI và TUI dùng chung)
 │   ├── keys.rs                 Thao tác với key: add/default/use/remove/rename (CLI và TUI dùng chung)
 │   ├── project.rs              Tình trạng thư mục hiện tại: key, gateway, slot, discovery
+│   ├── active.rs               Model một phiên mới sẽ chạy: xếp các file settings + shell như Claude Code
 │   ├── release.rs              Bản release mới nhất trên GitHub, thông báo có bản mới khi khởi động
 │   ├── ui.rs                   Hàm vẽ khung, dòng kẻ, dấu tick cho terminal
 │   ├── utils.rs                Hàm dùng chung: nhập liệu, copy thư mục, che key
@@ -27,6 +28,7 @@ ccc/
 │   │   ├── config.rs           `ccc config ...`
 │   │   ├── check.rs            `ccc check` (in báo cáo của checks.rs)
 │   │   ├── models.rs           `ccc models [list|set]`
+│   │   ├── current.rs          `ccc models current` + dòng Model của splash/version
 │   │   ├── pick.rs             `ccc models pick`: chọn model bằng phím mũi tên, không chiếm màn hình
 │   │   ├── doctor.rs           `ccc doctor`
 │   │   ├── permission.rs       `ccc permission`

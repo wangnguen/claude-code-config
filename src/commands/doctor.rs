@@ -5,8 +5,9 @@ use std::process::Command;
 use crate::api::{matches_filter, model_filter};
 use crate::checks::Status;
 use crate::config::{
-    ccc_home, default_settings_path, env_value, local_settings_path, read_json_or_default,
-    ENV_AUTH_TOKEN, ENV_BASE_URL, ENV_GATEWAY_DISCOVERY, SETTINGS_FILE, VERSION,
+    ccc_home, default_settings_path, env_value, local_settings_path, managed_settings_path,
+    read_json_or_default, ENV_AUTH_TOKEN, ENV_BASE_URL, ENV_GATEWAY_DISCOVERY, SETTINGS_FILE,
+    VERSION,
 };
 use crate::slots::{self, LEGACY_FAST_ENV, SLOTS};
 use crate::ui;
@@ -174,8 +175,8 @@ pub fn run() -> Result<()> {
     // Anything that outranks the file above and can silently undo it.
     ui::print_separator();
     let managed = managed_settings_path();
-    if Path::new(&managed).exists() {
-        ui::print_check(false, "Managed policy", &managed);
+    if managed.exists() {
+        ui::print_check(false, "Managed policy", &managed.display().to_string());
         fail += 1;
     } else {
         ui::print_check(true, "Managed policy", "none");
@@ -208,17 +209,6 @@ pub fn run() -> Result<()> {
 fn auth_state(json: &serde_json::Value) -> (bool, bool) {
     let is_set = |name: &str| json["env"][name].as_str().is_some_and(|v| !v.is_empty());
     (is_set(ENV_AUTH_TOKEN), is_set(crate::config::ENV_API_KEY))
-}
-
-/// System-wide policy file, which outranks every other settings source.
-fn managed_settings_path() -> String {
-    if cfg!(target_os = "windows") {
-        r"C:\ProgramData\ClaudeCode\managed-settings.json".to_string()
-    } else if cfg!(target_os = "macos") {
-        "/Library/Application Support/ClaudeCode/managed-settings.json".to_string()
-    } else {
-        "/etc/claude-code/managed-settings.json".to_string()
-    }
 }
 
 fn find_claude() -> Option<String> {

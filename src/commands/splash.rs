@@ -27,6 +27,7 @@ const SECTIONS: &[(&str, &[MenuItem])] = &[
     (
         "Models",
         &[
+            ("models current", "the model Claude Code starts on here"),
             ("models", "list the models your key can use"),
             ("models pick", "choose this folder's models"),
         ],
@@ -47,16 +48,22 @@ pub fn print() {
     let store = KeysStore::load();
     let project = ProjectState::load(&store);
     let key = format!("Key    {}", project.key_label());
-    let (ready, total) = project.slots_ready();
+    // The model a new session here starts on, not the list it could use.
+    let model = format!("Model  {}", super::current::banner_line());
     let models = if project.has_local {
-        format!("Models {ready}/{total} slots set")
+        let (ready, total) = project.slots_ready();
+        if ready == total {
+            "       models current shows every slot".to_string()
+        } else {
+            format!("       {} of {total} slots unusable — run models pick", total - ready)
+        }
     } else {
-        "Models not set here — run lite or models pick".to_string()
+        "       not set up here — run lite or models pick".to_string()
     };
     let update = release::available_update().map(|latest| format!("Update {latest} is out — run update"));
     ui::print_splash(
         &format!("Claude Code Config {VERSION}"),
-        &[key.as_str(), models.as_str()],
+        &[key.as_str(), model.as_str(), models.as_str()],
         update.as_deref(),
         SECTIONS,
     );

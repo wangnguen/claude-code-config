@@ -67,6 +67,28 @@ ghi nó cho các bản Claude Code cũ, luôn bằng giá trị slot Haiku.
 Bốn slot đầu **phải có giá trị** là model key bạn dùng được. Slot nào để trống
 thì alias tương ứng rơi về id built-in và nhận 403.
 
+### Model nào đang thật sự được dùng
+
+`ccc models current` (và dòng `Model` ở splash, `ccc version`, màn Home của TUI)
+cho biết một phiên Claude Code **mới** mở trong thư mục này sẽ chạy model nào.
+ccc tính theo đúng thứ tự của Claude Code:
+
+1. `ANTHROPIC_MODEL`, nếu có nguồn nào đặt
+2. nếu không có: trường `model`, chỗ `/model` lưu lựa chọn (`~/.claude/settings.json`)
+3. nếu không có: `ANTHROPIC_DEFAULT_MODEL`
+4. nếu không có: mặc định của Claude Code là `opus`
+
+Alias như `opus` hay `sonnet[1m]` được dịch qua slot tương ứng. Với mỗi biến,
+file settings thắng biến trong shell; giữa các file thì thứ tự là managed policy,
+`.claude/settings.local.json`, `.claude/settings.json`, rồi user settings.
+
+Vì `ccc lite` ghi `ANTHROPIC_MODEL`, model chọn bằng `/model` sẽ **không** có tác
+dụng ở thư mục đó; `ccc models current` báo dòng `Ignored` cho trường hợp này.
+Muốn đổi thì dùng `ccc models pick`.
+
+Lệnh chỉ đọc file. `--model` hoặc đổi `/model` trong phiên đang chạy thì không
+lưu ở đâu để đọc được, xem bằng `/status` trong Claude Code.
+
 ## Model discovery: nên bật, không bắt buộc
 
 `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` khiến `/model` liệt kê tên model
@@ -195,6 +217,7 @@ không có chuyện một lệnh cư xử khác nhau giữa hai chế độ.
 
 | Lệnh | Việc nó làm |
 |---|---|
+| `ccc models current` | Model mà một phiên Claude Code mới trong thư mục này sẽ chạy, lý do, và giá trị từng slot. Chỉ đọc file, không gọi mạng |
 | `ccc models` | Liệt kê model gateway trả về cho key, cái nào dùng được, slot nào đang dùng |
 | `ccc models pick` | Chọn model cho từng slot của thư mục này bằng phím mũi tên + Enter, chọn xong là lưu luôn |
 | `ccc models set <slot> <model>` | Đặt một slot; kiểm với gateway trước khi ghi |
