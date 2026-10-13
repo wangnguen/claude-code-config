@@ -56,4 +56,4 @@ Write-Host "Done! ccc installed to $CccHome" -ForegroundColor Green
 Write-Host "  - $CccHome\ccc.exe"
 Write-Host "  - $CccHome\.claude\"
 Write-Host ""
-Write-Host "Restart your terminal, then run: ccc key <your-api-key>" -ForegroundColor Cyan
+Write-Host "Restart your terminal to use ccc." -ForegroundColor Cyan
