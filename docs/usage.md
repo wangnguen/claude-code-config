@@ -268,6 +268,13 @@ ccc version
 ccc completions powershell   # sinh shell completion
 ```
 
+`ccc`, `ccc ui` và `ccc version` tự báo khi có bản mới (dòng vàng
+`Update 0.2.0 is out — run update`, hoặc `→ 0.2.0` ở góc trên TUI). Chúng hỏi
+GitHub tối đa 6 tiếng một lần, chờ tối đa 2 giây, và nhớ kết quả trong
+`~/.ccc/update-check.json`, nên phần lớn các lần mở không tốn request nào.
+`ccc update` thì luôn hỏi lại. Muốn tắt thông báo: đặt biến môi trường
+`CCC_NO_UPDATE_CHECK=1`.
+
 ## Gỡ cài đặt
 
 ```bash

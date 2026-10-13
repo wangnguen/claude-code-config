@@ -61,19 +61,19 @@ pub fn fit_middle(text: &str, width: usize) -> String {
 /// the version on the right, and the screen's key hints on the last line.
 /// Returns the area left for the screen's own content.
 pub fn page(frame: &mut Frame, area: Rect, title: &str, hints: &[Hint]) -> Rect {
+    let heading = Line::from(vec![
+        Span::styled(" ccc ", Style::default().fg(ACCENT).bold()),
+        Span::styled("› ", Style::default().fg(DIM)),
+        Span::styled(format!("{title} "), Style::default().fg(Color::White).bold()),
+    ]);
+    // Both corners and the heading stay clear of the version.
+    let room = (area.width as usize).saturating_sub(heading.width() + 2);
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(BORDER))
         .style(Style::default().bg(BG))
-        .title(Line::from(vec![
-            Span::styled(" ccc ", Style::default().fg(ACCENT).bold()),
-            Span::styled("› ", Style::default().fg(DIM)),
-            Span::styled(format!("{title} "), Style::default().fg(Color::White).bold()),
-        ]))
-        .title(
-            Line::from(Span::styled(format!(" v{VERSION} "), Style::default().fg(DIM)))
-                .right_aligned(),
-        );
+        .title(heading)
+        .title(version_title(crate::release::known_update(), room).right_aligned());
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -81,6 +81,19 @@ pub fn page(frame: &mut Frame, area: Rect, title: &str, hints: &[Hint]) -> Rect 
         Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(inner);
     hint_bar(frame, hints_area.inner(Margin { horizontal: 1, vertical: 0 }), hints);
     body.inner(Margin { horizontal: 1, vertical: 0 })
+}
+
+/// This build's version, then the newer release when one is out, with the
+/// command that installs it when `room` allows.
+fn version_title(latest: Option<&str>, room: usize) -> Line<'static> {
+    let current = Span::styled(format!(" v{VERSION} "), Style::default().fg(DIM));
+    let Some(latest) = latest else {
+        return Line::from(current);
+    };
+    let room = room.saturating_sub(current.width());
+    let long = format!("→ {latest} · ccc update ");
+    let notice = if measure_text_width(&long) <= room { long } else { format!("→ {latest} ") };
+    Line::from(vec![current, Span::styled(notice, Style::default().fg(WARNING).bold())])
 }
 
 /// Key hints on one line. The list is in priority order: hints are kept from
@@ -243,5 +256,19 @@ mod tests {
     fn centered_clamps_to_the_area() {
         let r = centered(100, 50, Rect::new(0, 0, 40, 10));
         assert_eq!(r, Rect::new(0, 0, 40, 10));
+    }
+
+    #[test]
+    fn version_title_names_a_newer_release_and_fits_its_room() {
+        assert_eq!(text(&version_title(None, 80)), format!(" v{VERSION} "));
+
+        let roomy = text(&version_title(Some("9.9.9"), 80));
+        assert!(roomy.ends_with("→ 9.9.9 · ccc update "), "{roomy}");
+
+        // The heading of the longest screen title at the narrowest supported width.
+        let room = MIN_WIDTH as usize - 2 - " ccc › Keys › Test every key ".chars().count();
+        let tight = text(&version_title(Some("10.10.10"), room));
+        assert!(measure_text_width(&tight) <= room, "{tight}");
+        assert!(tight.contains("10.10.10"), "{tight}");
     }
 }

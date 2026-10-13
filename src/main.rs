@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod keys;
 mod project;
+mod release;
 mod slots;
 mod tui;
 mod ui;

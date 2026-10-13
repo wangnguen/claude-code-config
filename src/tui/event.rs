@@ -16,6 +16,10 @@ pub fn run(screen: Screen) -> Result<()> {
         );
     }
 
+    // Look for a newer release before taking over the screen: the header
+    // reads the answer on every frame and must never wait for it.
+    crate::release::available_update();
+
     // try_init also installs a panic hook that restores the terminal, so a bug
     // can never leave the shell stuck in raw mode on the alternate screen.
     let mut terminal = ratatui::try_init()?;

@@ -15,6 +15,7 @@ ccc/
 │   ├── checks.rs               Các bước của `ccc check` dưới dạng dữ liệu (CLI và TUI dùng chung)
 │   ├── keys.rs                 Thao tác với key: add/default/use/remove/rename (CLI và TUI dùng chung)
 │   ├── project.rs              Tình trạng thư mục hiện tại: key, gateway, slot, discovery
+│   ├── release.rs              Bản release mới nhất trên GitHub, thông báo có bản mới khi khởi động
 │   ├── ui.rs                   Hàm vẽ khung, dòng kẻ, dấu tick cho terminal
 │   ├── utils.rs                Hàm dùng chung: nhập liệu, copy thư mục, che key
 │   │
@@ -75,6 +76,7 @@ Có ba nơi chứa trạng thái, dễ nhầm lẫn nhất trong repo này:
 ├── ccc.exe                             binary
 ├── keys.json                           kho key: { active, keys: {tên: giá trị} }
 ├── ccc.json                            tuỳ chọn của ccc: { model_filter } (có thể chưa có)
+├── update-check.json                   lần cuối hỏi GitHub bản mới nhất: { checked_at, latest }
 └── .claude/
     └── settings.local.json             config MẪU (Claude Code KHÔNG đọc file này)
 

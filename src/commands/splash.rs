@@ -1,5 +1,6 @@
 use crate::config::{KeysStore, VERSION};
 use crate::project::ProjectState;
+use crate::release;
 use crate::ui::{self, MenuItem};
 
 /// The path through the commands rather than all of them; `help` still lists
@@ -52,9 +53,11 @@ pub fn print() {
     } else {
         "Models not set here — run lite or models pick".to_string()
     };
+    let update = release::available_update().map(|latest| format!("Update {latest} is out — run update"));
     ui::print_splash(
         &format!("Claude Code Config {VERSION}"),
         &[key.as_str(), models.as_str()],
+        update.as_deref(),
         SECTIONS,
     );
     ui::print_rule();

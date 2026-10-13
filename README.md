@@ -74,7 +74,7 @@ ccc models set sonnet 'claude-sonnet-5-vn[1m]'
 # Check environment and config status
 ccc doctor
 
-# Check for updates
+# Check for updates and install the newest release
 ccc update
 
 # Remove ccc: ~/.ccc, saved keys, and the installer's PATH entry
@@ -83,6 +83,14 @@ ccc uninstall
 # Show version
 ccc version
 ```
+
+## Updates
+
+`ccc`, `ccc ui` and `ccc version` say when a newer release is out, for example
+`Update 0.2.0 is out — run update`. They ask GitHub at most once every 6 hours,
+wait at most 2 seconds for the answer, and keep it in
+`~/.ccc/update-check.json`. `ccc update` always asks afresh. Set
+`CCC_NO_UPDATE_CHECK=1` to turn the notice off.
 
 ## Model slots
 

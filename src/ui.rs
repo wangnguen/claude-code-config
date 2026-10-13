@@ -311,20 +311,22 @@ fn mark_lines() -> Vec<String> {
         .collect()
 }
 
-/// The wordmark plus the caption lines under it, as one block.
-fn brand_lines(caption: &str, details: &[&str]) -> Vec<String> {
+/// The wordmark plus the caption lines under it, as one block. A notice comes
+/// last and in yellow: unlike the dimmed details, it asks for something.
+fn brand_lines(caption: &str, details: &[&str], notice: Option<&str>) -> Vec<String> {
     let mut lines = mark_lines();
     // The name keeps the terminal's own foreground colour: it is the one line
     // that has to stay readable on a light theme as well as a dark one.
     lines.push(caption.to_string());
     lines.extend(details.iter().map(|d| style(d).dim().to_string()));
+    lines.extend(notice.map(|n| style(n).yellow().to_string()));
     lines
 }
 
 /// The wordmark, with the caption lines under it the way a splash screen reads:
 /// what this is, then the one setting worth knowing.
-pub fn print_brand(caption: &str, details: &[&str]) {
-    for line in brand_lines(caption, details) {
+pub fn print_brand(caption: &str, details: &[&str], notice: Option<&str>) {
+    for line in brand_lines(caption, details, notice) {
         println!("  {line}");
     }
 }
@@ -426,8 +428,13 @@ fn splash_layout(columns: usize, left_width: usize, full_menu: usize) -> SplashL
 
 /// Splash screen: wordmark on the left, what you can run on the right — or
 /// underneath when the terminal is too narrow for both, so nothing wraps.
-pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[MenuItem])]) {
-    let left = brand_lines(caption, details);
+pub fn print_splash(
+    caption: &str,
+    details: &[&str],
+    notice: Option<&str>,
+    sections: &[(&str, &[MenuItem])],
+) {
+    let left = brand_lines(caption, details, notice);
     // The widest line on the left decides the column, so a long model name
     // cannot shove the box sideways on one row and not the others.
     let column = left
