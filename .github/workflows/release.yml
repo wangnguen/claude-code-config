@@ -30,15 +30,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag and bump patch version
+      - name: Work out the next version (Cargo.toml if raised, else patch + 1)
         id: bump
         run: |
           # Get latest tag, default to v0.0.0 if none
           LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          VERSION="${LATEST_TAG#v}"
+
+          # Cargo.toml normally holds the last released version, written by
+          # this job. Raised by hand above the latest tag (0.1.11 → 0.2.0), it
+          # is released as it stands; otherwise the patch number goes up.
+          # `sed -n 1p` rather than `head -1`: it reads to the end, so sed is
+          # never killed by SIGPIPE, which pipefail would turn into a failure.
+          CARGO_VERSION=$(sed -n 's/^version = "\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"[[:space:]]*$/\1/p' Cargo.toml | sed -n 1p)
+          HIGHEST=$(printf '%s\n%s\n' "$VERSION" "$CARGO_VERSION" | sort -V | tail -1)
+
           if [ -z "$LATEST_TAG" ]; then
             NEW_VERSION="0.1.0"
+          elif [ -n "$CARGO_VERSION" ] && [ "$CARGO_VERSION" != "$VERSION" ] && [ "$HIGHEST" = "$CARGO_VERSION" ]; then
+            NEW_VERSION="$CARGO_VERSION"
+            echo "Cargo.toml asks for $NEW_VERSION (latest tag $LATEST_TAG)"
           else
-            VERSION="${LATEST_TAG#v}"
+            if [ -n "$CARGO_VERSION" ] && [ "$CARGO_VERSION" != "$VERSION" ]; then
+              echo "::warning::Cargo.toml says $CARGO_VERSION, behind $LATEST_TAG; bumping the patch from the tag instead."
+            fi
             MAJOR=$(echo "$VERSION" | cut -d. -f1)
             MINOR=$(echo "$VERSION" | cut -d. -f2)
             PATCH=$(echo "$VERSION" | cut -d. -f3)

@@ -245,7 +245,8 @@ Mỗi lần push lên `main`:
         ↓
 2. Job "bump-and-release"
    ├─ Đọc tag mới nhất, tăng số patch (0.1.26 → 0.1.27)
-   ├─ Sửa version trong Cargo.toml, rồi `cargo update -w` để Cargo.lock khớp theo
+   │  hoặc giữ nguyên version trong Cargo.toml nếu nó đã được nâng cao hơn tag (xem dưới)
+   ├─ Ghi version vào Cargo.toml, rồi `cargo update -w` để Cargo.lock khớp theo
    ├─ Commit "bump v0.1.27" và push lên main
    └─ Tạo tag v0.1.27
         ↓
@@ -263,10 +264,34 @@ Mỗi lần push lên `main`:
 Commit có nội dung chứa `bump v` sẽ bị bỏ qua, nhờ đó commit do CI tự tạo không
 kích hoạt lại workflow gây vòng lặp vô hạn.
 
-Version **không** được sửa bằng tay trong `Cargo.toml` — CI tự tăng.
+Số **patch** không sửa bằng tay — CI tự tăng.
+
+### Lên minor / major (0.1.x → 0.2.0)
+
+Sửa version trong `Cargo.toml` thành version muốn ra, rồi commit và push như
+bình thường:
+
+```toml
+[package]
+name = "ccc"
+version = "0.2.0"
+```
+
+```bash
+cargo update -w          # cho Cargo.lock khớp (CI cũng tự làm nếu bạn quên)
+git commit -am "feat: ..."
+git push
+```
+
+- CI thấy `Cargo.toml` cao hơn tag mới nhất (v0.1.11) nên ra đúng **0.2.0**,
+  không cộng thêm patch.
+- Các lần push sau tự tăng patch từ đó: 0.2.0 → 0.2.1 → …
+- Nếu `Cargo.toml` thấp hơn tag (ví dụ nhánh cũ chưa pull), CI bỏ qua nó, cảnh
+  báo trong log và tăng patch từ tag như thường.
+- Message đừng chứa chuỗi `bump v`, vì commit như vậy bị CI bỏ qua (xem trên).
 
 Bước bump commit cả `Cargo.toml` lẫn `Cargo.lock`, nên sau khi `git pull` hai
-file luôn khớp version. Nếu bạn lỡ sửa version bằng tay (hoặc thêm/bớt
+file luôn khớp version. Nếu bạn sửa version bằng tay (hoặc thêm/bớt
 dependency), đồng bộ lại lock trước khi commit để cây làm việc không bẩn:
 
 ```bash
