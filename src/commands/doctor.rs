@@ -48,13 +48,13 @@ pub fn run() -> Result<()> {
         ui::print_check(true, "Global config", &global_path.display().to_string());
         pass += 1;
 
+        // The template is meant to carry no key: keys live in keys.json and
+        // in each folder. Either way it is information, not a failure.
         let json = read_json_or_default(&global_path);
         if auth_state(&json).0 {
-            ui::print_check(true, "Auth token", "set (template)");
-            pass += 1;
+            ui::print_row("Auth token", "set in the template (keys belong in keys.json)");
         } else {
-            ui::print_check(false, "Auth token", "not set. Run 'ccc key'");
-            fail += 1;
+            ui::print_row("Auth token", "none in the template, as expected");
         }
         // ccc's "global" file is only a template it copies on init; Claude Code
         // never reads it. Say so, or people edit it and wonder why nothing changed.
@@ -79,7 +79,7 @@ pub fn run() -> Result<()> {
     // 5. Local settings
     let local_path = local_settings_path();
     if local_path.exists() {
-        ui::print_check(true, SETTINGS_FILE, &local_path.display().to_string());
+        ui::print_check(true, "Local settings", &local_path.display().to_string());
         pass += 1;
 
         let json = read_json_or_default(&local_path);
@@ -140,7 +140,7 @@ pub fn run() -> Result<()> {
             }
         }
     } else {
-        ui::print_check(false, SETTINGS_FILE, "not found. Run 'ccc init'");
+        ui::print_check(false, "Local settings", &format!("no {SETTINGS_FILE}. Run 'ccc lite' or 'ccc init'"));
         fail += 1;
     }
 
