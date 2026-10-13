@@ -1,25 +1,64 @@
-use crate::api::get_api_config;
-use crate::config::VERSION;
-use crate::ui;
+use crate::config::{KeysStore, VERSION};
+use crate::project::ProjectState;
+use crate::ui::{self, MenuItem};
 
 /// The path through the commands rather than all of them; `help` still lists
-/// the full set.
-const SECTIONS: &[(&str, &[&str])] = &[
-    ("Setup", &["lite", "init", "permission"]),
-    ("Keys", &["key", "key use"]),
-    ("Check", &["check", "models", "doctor"]),
+/// the full set. Each line says what the command does, because "key use" and
+/// "key default" mean nothing until someone has been told the difference.
+const SECTIONS: &[(&str, &[MenuItem])] = &[
+    (
+        "Setup",
+        &[
+            ("lite", "set up this folder for the team gateway"),
+            ("init", "copy ccc's config template into this folder"),
+            ("permission", "allow the usual tools without prompts"),
+        ],
+    ),
+    (
+        "Keys",
+        &[
+            ("key", "open the key manager"),
+            ("key add <name> <key>", "save a key under a name"),
+            ("key use [name]", "make this folder use a saved key"),
+            ("key default [name]", "key `init` puts in new folders"),
+        ],
+    ),
+    (
+        "Models",
+        &[
+            ("models", "list the models your key can use"),
+            ("models pick", "choose this folder's models"),
+        ],
+    ),
+    (
+        "Check",
+        &[
+            ("check", "test key, models and discovery"),
+            ("doctor", "inspect the whole setup"),
+            ("ui", "everything above, full-screen"),
+        ],
+    ),
 ];
 
-/// Header of the interactive shell: wordmark, what this is, and where to start.
+/// Header of the interactive shell: wordmark, where this folder stands, and
+/// where to start.
 pub fn print() {
-    let (_, model) = get_api_config();
+    let store = KeysStore::load();
+    let project = ProjectState::load(&store);
+    let key = format!("Key    {}", project.key_label());
+    let (ready, total) = project.slots_ready();
+    let models = if project.has_local {
+        format!("Models {ready}/{total} slots set")
+    } else {
+        "Models not set here — run lite or models pick".to_string()
+    };
     ui::print_splash(
         &format!("Claude Code Config {VERSION}"),
-        &[model.as_str()],
+        &[key.as_str(), models.as_str()],
         SECTIONS,
     );
     ui::print_rule();
-    ui::print_hint("? for this list · help for every command · clear to tidy up · exit to leave");
+    ui::print_hint("? this list · help all commands · clear wipes the screen · exit to leave");
 }
 
 /// Sign-off for the interactive shell, Ctrl-C included: a prompt that simply

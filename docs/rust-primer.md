@@ -14,11 +14,15 @@ Rust có hai kiểu chuỗi, đây là thứ gây bối rối nhất lúc đầu
 
 ```rust
 // src/api.rs
-pub const VN_SUFFIX: &str = "-vn";        // chuỗi hằng → &str
+pub const TEAM_MODEL_FILTER: &str = "-vn";   // chuỗi hằng → &str
 
-pub fn is_vn_model(id: &str) -> bool {    // nhận &str: chỉ đọc, không lấy quyền sở hữu
-    id.to_lowercase().ends_with(VN_SUFFIX)
-}                                          // to_lowercase() tạo String mới
+// nhận &str: chỉ đọc, không lấy quyền sở hữu
+pub fn matches_filter(id: &str, filter: &str) -> bool {
+    filter.is_empty()
+        || base_model_id(id)
+            .to_lowercase()                      // to_lowercase() tạo String mới
+            .ends_with(&filter.to_lowercase())
+}
 ```
 
 **Quy tắc thực dụng:** tham số hàm dùng `&str`, giá trị trả về dùng `String`.
@@ -234,8 +238,8 @@ Dùng `_ => {}` nếu muốn gom phần còn lại.
 ## 8. Iterator và closure
 
 ```rust
-// src/commands/check.rs
-let vn: Vec<&String> = models.iter().filter(|m| is_vn_model(m)).collect();
+// src/api.rs — usable_models()
+let usable: Vec<String> = models.iter().filter(|m| matches_filter(m, filter)).cloned().collect();
 ```
 
 Đọc từ trái sang phải:
@@ -244,7 +248,8 @@ let vn: Vec<&String> = models.iter().filter(|m| is_vn_model(m)).collect();
 |---|---|
 | `models.iter()` | Duyệt qua từng phần tử (mượn, không sở hữu) |
 | `.filter(|m| ...)` | Giữ lại phần tử nào thoả điều kiện |
-| `\|m\| is_vn_model(m)` | Closure — hàm ẩn danh, `m` là tham số |
+| `\|m\| matches_filter(m, filter)` | Closure — hàm ẩn danh, `m` là tham số |
+| `.cloned()` | Biến `&String` (mượn) thành `String` (bản sao sở hữu) |
 | `.collect()` | Gom kết quả lại thành `Vec` |
 
 `|m| ...` chính là lambda. Tương đương `lambda m: ...` của Python.
@@ -266,8 +271,12 @@ Mỗi file `.rs` là một module. Phải **khai báo** thì mới dùng đượ
 ```rust
 // src/main.rs — khai báo các module cấp cao nhất
 mod api;
+mod checks;
 mod commands;
 mod config;
+mod keys;
+mod project;
+mod slots;
 mod tui;
 mod ui;
 mod utils;
@@ -283,8 +292,8 @@ pub mod models;
 `use` là để gọi cho ngắn:
 
 ```rust
-// src/commands/check.rs
-use crate::api::{get_current_key, is_vn_model, list_models};
+// src/commands/models.rs
+use crate::api::{get_current_key, is_listed, list_models_at};
 
 // nhờ dòng trên, viết được:
 let key = get_current_key();

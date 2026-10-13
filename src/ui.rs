@@ -2,10 +2,17 @@ use console::{colors_enabled, measure_text_width, style, truncate_str, Emoji, Te
 use indicatif::{ProgressBar, ProgressStyle};
 use std::sync::OnceLock;
 
+use crate::checks::Status;
+
 // ── Cross-platform icons ──
 
 pub static ICON_OK:    Emoji = Emoji("✅", "[OK]");
 pub static ICON_FAIL:  Emoji = Emoji("❌", "[X]");
+// Both are wide emoji by default, like the two above. "⚠" is not: it needs a
+// variation selector to be wide, and terminals disagree on how to count that,
+// which would knock the label column out of line.
+pub static ICON_WARN:  Emoji = Emoji("🟡", "[!]");
+pub static ICON_INFO:  Emoji = Emoji("➖", "[-]");
 pub static ICON_SEARCH:Emoji = Emoji("🔍", "(?)");
 pub static ICON_DOC:   Emoji = Emoji("📋", "(i)");
 
@@ -61,7 +68,7 @@ fn pad(text: &str, columns: usize) -> String {
 
 /// Shorten from the middle: for a path the file name at the end identifies it
 /// as much as the drive at the start, so cutting the tail off loses the most.
-fn shorten(text: &str, columns: usize) -> String {
+pub fn shorten(text: &str, columns: usize) -> String {
     if measure_text_width(text) <= columns {
         return text.to_string();
     }
@@ -113,40 +120,55 @@ pub fn print_row(label: &str, value: &str) {
 }
 
 pub fn print_check(ok: bool, label: &str, detail: &str) {
-    let icon = if ok { &ICON_OK } else { &ICON_FAIL };
-    let label = if ok {
-        style(label).green().to_string()
-    } else {
-        style(label).red().to_string()
+    print_status(if ok { Status::Pass } else { Status::Fail }, label, detail);
+}
+
+pub fn print_status(status: Status, label: &str, detail: &str) {
+    print_status_with(status, label, detail, LABEL_WIDTH);
+}
+
+/// `print_status` with a label column wider than the usual 16, for lists of
+/// long names such as model ids.
+pub fn print_status_with(status: Status, label: &str, detail: &str, label_width: usize) {
+    let (icon, label) = match status {
+        Status::Pass => (&ICON_OK, style(label).green().to_string()),
+        Status::Fail => (&ICON_FAIL, style(label).red().to_string()),
+        Status::Warn => (&ICON_WARN, style(label).yellow().to_string()),
+        Status::Info => (&ICON_INFO, style(label).dim().to_string()),
     };
     // The icon gets a fixed cell: "[X]" is one column narrower than "[OK]",
     // which would otherwise shift the label column row by row.
     let head = format!(
         "  {} {} ",
         pad(&icon.to_string(), ICON_WIDTH),
-        pad(&label, LABEL_WIDTH)
+        pad(&label, label_width)
     );
 
     let room = width().saturating_sub(measure_text_width(&head));
     let detail = shorten(detail, room);
-    let detail = if ok {
-        detail
-    } else {
-        style(detail).red().to_string()
+    let detail = match status {
+        Status::Pass => detail,
+        Status::Fail => style(detail).red().to_string(),
+        Status::Warn => style(detail).yellow().to_string(),
+        Status::Info => style(detail).dim().to_string(),
     };
     row(&format!("{head}{detail}"));
 }
 
-pub fn print_result_line(pass: usize, fail: usize) {
-    let total = pass + fail;
-    let result = if fail == 0 {
+pub fn print_result_line(pass: usize, warn: usize, fail: usize) {
+    let total = pass + warn + fail;
+    let result = if warn == 0 && fail == 0 {
         style(format!("All {total} checks passed")).green().bold().to_string()
     } else {
-        format!(
-            "{} {}",
-            style(format!("{pass}/{total} passed")).green().bold(),
-            style(format!("{fail} failed")).red().bold(),
-        )
+        let mut parts = vec![style(format!("{pass}/{total} passed")).green().bold().to_string()];
+        if warn > 0 {
+            let noun = if warn == 1 { "warning" } else { "warnings" };
+            parts.push(style(format!("{warn} {noun}")).yellow().bold().to_string());
+        }
+        if fail > 0 {
+            parts.push(style(format!("{fail} failed")).red().bold().to_string());
+        }
+        parts.join(&style(" · ").dim().to_string())
     };
     row(&format!("  {result}"));
 }
@@ -307,16 +329,36 @@ pub fn print_brand(caption: &str, details: &[&str]) {
     }
 }
 
+/// One line of the splash menu: the command, and what it does.
+pub type MenuItem<'a> = (&'a str, &'a str);
+
 /// A bordered list whose section titles sit in the border itself, so a group of
-/// commands costs one line instead of a blank line plus a heading.
-fn menu_box(sections: &[(&str, &[&str])]) -> Vec<String> {
-    let entry = |item: &str| format!("  {} {item}", style("›").cyan());
+/// commands costs one line instead of a blank line plus a heading. With
+/// `describe`, each command carries its one-line description in a second column.
+fn menu_box(sections: &[(&str, &[MenuItem])], describe: bool) -> Vec<String> {
+    let command_width = sections
+        .iter()
+        .flat_map(|(_, items)| items.iter().map(|(cmd, _)| measure_text_width(cmd)))
+        .max()
+        .unwrap_or(0);
+    let entry = |(cmd, desc): &MenuItem| {
+        if describe {
+            format!(
+                "  {} {}  {} ",
+                style("›").cyan(),
+                pad(cmd, command_width),
+                style(desc).dim()
+            )
+        } else {
+            format!("  {} {cmd} ", style("›").cyan())
+        }
+    };
     let inner = sections
         .iter()
         .flat_map(|(title, items)| {
             items
                 .iter()
-                .map(|i| i.len() + 5)
+                .map(|item| measure_text_width(&entry(item)))
                 .chain(std::iter::once(title.len() + 3))
         })
         .max()
@@ -359,10 +401,33 @@ fn menu_box(sections: &[(&str, &[&str])]) -> Vec<String> {
     lines
 }
 
-/// Splash screen: wordmark on the left, what you can run on the right.
-pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[&str])]) {
+/// How the splash fits a terminal of a given width.
+#[derive(Debug, PartialEq, Eq)]
+enum SplashLayout {
+    /// Wordmark and menu side by side.
+    Beside,
+    /// Menu under the wordmark.
+    Below,
+    /// Menu under the wordmark, commands only.
+    BelowCompact,
+}
+
+fn splash_layout(columns: usize, left_width: usize, full_menu: usize) -> SplashLayout {
+    // 2 columns of indent, 3 between the halves, one spare so the last column
+    // never sits on the wrap point.
+    if 2 + left_width + 3 + full_menu < columns {
+        SplashLayout::Beside
+    } else if 2 + full_menu < columns {
+        SplashLayout::Below
+    } else {
+        SplashLayout::BelowCompact
+    }
+}
+
+/// Splash screen: wordmark on the left, what you can run on the right — or
+/// underneath when the terminal is too narrow for both, so nothing wraps.
+pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[MenuItem])]) {
     let left = brand_lines(caption, details);
-    let right = menu_box(sections);
     // The widest line on the left decides the column, so a long model name
     // cannot shove the box sideways on one row and not the others.
     let column = left
@@ -372,13 +437,31 @@ pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[&str])
         .unwrap_or(0)
         .max(mark_width());
 
+    let full = menu_box(sections, true);
+    let full_width = full.first().map(|l| measure_text_width(l)).unwrap_or(0);
+    let columns = Term::stdout().size().1 as usize;
+
     println!();
-    for i in 0..left.len().max(right.len()) {
-        match (left.get(i), right.get(i)) {
-            (Some(l), Some(r)) => println!("  {}   {r}", pad(l, column)),
-            (Some(l), None) => println!("  {l}"),
-            (None, Some(r)) => println!("  {}   {r}", " ".repeat(column)),
-            (None, None) => break,
+    match splash_layout(columns, column, full_width) {
+        SplashLayout::Beside => {
+            for i in 0..left.len().max(full.len()) {
+                match (left.get(i), full.get(i)) {
+                    (Some(l), Some(r)) => println!("  {}   {r}", pad(l, column)),
+                    (Some(l), None) => println!("  {l}"),
+                    (None, Some(r)) => println!("  {}   {r}", " ".repeat(column)),
+                    (None, None) => break,
+                }
+            }
+        }
+        layout => {
+            let menu = if layout == SplashLayout::Below {
+                full
+            } else {
+                menu_box(sections, false)
+            };
+            for line in left.iter().chain(std::iter::once(&String::new())).chain(menu.iter()) {
+                println!("  {line}");
+            }
         }
     }
     println!();
@@ -386,14 +469,62 @@ pub fn print_splash(caption: &str, details: &[&str], sections: &[(&str, &[&str])
 
 // ── Spinner ──
 
+/// A spinner that sits inside a box, under its left border.
 pub fn spinner(msg: &str) -> ProgressBar {
+    spinner_with("  │  {spinner:.cyan} {msg}", msg)
+}
+
+/// A spinner for plain output, where a lone box border would look broken.
+pub fn plain_spinner(msg: &str) -> ProgressBar {
+    spinner_with("  {spinner:.cyan} {msg}", msg)
+}
+
+fn spinner_with(template: &str, msg: &str) -> ProgressBar {
     let sp = ProgressBar::new_spinner();
     sp.set_style(
-        ProgressStyle::with_template("  │  {spinner:.cyan} {msg}")
+        ProgressStyle::with_template(template)
             .unwrap()
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", "✓"]),
     );
     sp.set_message(msg.to_string());
     sp.enable_steady_tick(std::time::Duration::from_millis(80));
     sp
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fit_leaves_text_of_exactly_the_width_alone() {
+        assert_eq!(fit("abcde", 5), "abcde");
+        assert_eq!(fit("abcdef", 5), "abcd…");
+    }
+
+    #[test]
+    fn shorten_hits_the_requested_width() {
+        let url = "https://litellm-proxy-ep-cncyfugmcnadc6g4.a02.azurefd.net/v1/models";
+        assert_eq!(measure_text_width(&shorten(url, 56)), 56);
+        assert!(shorten(url, 56).ends_with("/v1/models"));
+    }
+
+    #[test]
+    fn menu_rows_share_one_width() {
+        let sections: &[(&str, &[MenuItem])] = &[
+            ("Keys", &[("key", "open the key manager"), ("key add <name> <key>", "save a key")]),
+            ("Check", &[("check", "test")]),
+        ];
+        for describe in [true, false] {
+            let lines = menu_box(sections, describe);
+            let widths: Vec<usize> = lines.iter().map(|l| measure_text_width(l)).collect();
+            assert!(widths.windows(2).all(|w| w[0] == w[1]), "{widths:?}");
+        }
+    }
+
+    #[test]
+    fn splash_stacks_when_the_terminal_is_narrow() {
+        assert_eq!(splash_layout(200, 31, 60), SplashLayout::Beside);
+        assert_eq!(splash_layout(80, 31, 60), SplashLayout::Below);
+        assert_eq!(splash_layout(50, 31, 60), SplashLayout::BelowCompact);
+    }
 }

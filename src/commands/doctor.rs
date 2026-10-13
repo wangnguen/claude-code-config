@@ -2,11 +2,13 @@ use anyhow::Result;
 use std::path::Path;
 use std::process::Command;
 
-use crate::api::is_vn_model;
+use crate::api::{matches_filter, model_filter};
+use crate::checks::Status;
 use crate::config::{
-    ccc_home, default_settings_path, local_settings_path, read_json_or_default,
-    ENV_AUTH_TOKEN, ENV_GATEWAY_DISCOVERY, MODEL_ENV_KEYS, SETTINGS_FILE, VERSION,
+    ccc_home, default_settings_path, env_value, local_settings_path, read_json_or_default,
+    ENV_AUTH_TOKEN, ENV_BASE_URL, ENV_GATEWAY_DISCOVERY, SETTINGS_FILE, VERSION,
 };
+use crate::slots::{self, LEGACY_FAST_ENV, SLOTS};
 use crate::ui;
 
 pub fn run() -> Result<()> {
@@ -14,6 +16,7 @@ pub fn run() -> Result<()> {
     ui::print_header(&ui::ICON_DOC, &format!("ccc doctor v{VERSION}"));
 
     let mut pass = 0;
+    let mut warn = 0;
     let mut fail = 0;
 
     // 1. Claude Code installed
@@ -52,9 +55,9 @@ pub fn run() -> Result<()> {
         // in each folder. Either way it is information, not a failure.
         let json = read_json_or_default(&global_path);
         if auth_state(&json).0 {
-            ui::print_row("Auth token", "set in the template (keys belong in keys.json)");
+            ui::print_status(Status::Info, "Auth token", "set in the template (keys belong in keys.json)");
         } else {
-            ui::print_row("Auth token", "none in the template, as expected");
+            ui::print_status(Status::Info, "Auth token", "none in the template, as expected");
         }
         // ccc's "global" file is only a template it copies on init; Claude Code
         // never reads it. Say so, or people edit it and wonder why nothing changed.
@@ -111,33 +114,57 @@ pub fn run() -> Result<()> {
             None => { ui::print_check(false, "Base URL", "not set"); fail += 1; }
         }
 
+        // Optional: without it /model lists only the aliases, and those work
+        // as long as every slot below is set.
         let discovery = json["env"][ENV_GATEWAY_DISCOVERY].as_str();
         if discovery == Some("1") {
-            ui::print_check(true, "Discovery", "enabled");
+            ui::print_check(true, "Discovery", "on");
             pass += 1;
         } else {
-            ui::print_check(false, "Discovery", "set it to 1 to see gateway models");
-            fail += 1;
+            ui::print_status(Status::Warn, "Discovery", "off — /model shows aliases only");
+            warn += 1;
         }
 
-        // A model pinned to a built-in name is the usual cause of
-        // "403 key not allowed to access model".
+        // A slot pinned to a model outside the filter, or not pinned at all,
+        // is the usual cause of "403 key not allowed to access model".
+        // Offline, the filter is all there is to go on; `ccc check` asks the
+        // gateway.
+        let filter = model_filter();
+        let rule = if filter.is_empty() {
+            "no model filter; 'ccc check' asks the gateway".to_string()
+        } else {
+            format!("must end in {filter}")
+        };
         ui::print_separator();
-        for name in MODEL_ENV_KEYS {
-            match json["env"][*name].as_str().filter(|v| !v.is_empty()) {
-                Some(value) if is_vn_model(value) => {
-                    ui::print_check(true, name, value);
+        ui::print_row("Models", &rule);
+        for (i, slot) in SLOTS.iter().enumerate() {
+            let label = format!("{} model", slot.label);
+            match slots::read(&json, i) {
+                Some(value) if matches_filter(&value, &filter) => {
+                    ui::print_check(true, &label, &value);
                     pass += 1;
                 }
                 Some(value) => {
-                    ui::print_check(false, name, &format!("{value} — built-in name, will 403"));
+                    ui::print_check(false, &label, &format!("{value} — not {filter}, will 403"));
                     fail += 1;
                 }
+                None if slot.optional => ui::print_status(Status::Info, &label, "not set (optional)"),
                 None => {
-                    ui::print_check(false, name, "not set — falls back to a built-in, will 403");
+                    ui::print_check(false, &label, &format!("{} not set — falls back to a built-in, will 403", slot.env));
                     fail += 1;
                 }
             }
+        }
+        match env_value(&json, LEGACY_FAST_ENV) {
+            Some(value) if matches_filter(&value, &filter) => {
+                ui::print_check(true, "Fast (legacy)", &value);
+                pass += 1;
+            }
+            Some(value) => {
+                ui::print_check(false, "Fast (legacy)", &format!("{value} — not {filter}, will 403"));
+                fail += 1;
+            }
+            None => ui::print_status(Status::Info, "Fast (legacy)", "not set — deprecated, Haiku slot covers it"),
         }
     } else {
         ui::print_check(false, "Local settings", &format!("no {SETTINGS_FILE}. Run 'ccc lite' or 'ccc init'"));
@@ -155,8 +182,9 @@ pub fn run() -> Result<()> {
         pass += 1;
     }
 
-    let overrides: Vec<&str> = ["ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL", ENV_AUTH_TOKEN]
+    let overrides: Vec<&str> = [ENV_BASE_URL, ENV_AUTH_TOKEN, LEGACY_FAST_ENV]
         .into_iter()
+        .chain(SLOTS.iter().map(|slot| slot.env))
         .filter(|name| std::env::var(name).is_ok_and(|v| !v.is_empty()))
         .collect();
     if overrides.is_empty() {
@@ -169,7 +197,7 @@ pub fn run() -> Result<()> {
 
     // Result
     ui::print_separator();
-    ui::print_result_line(pass, fail);
+    ui::print_result_line(pass, warn, fail);
     ui::print_footer();
     println!();
 
@@ -195,12 +223,12 @@ fn managed_settings_path() -> String {
 
 fn find_claude() -> Option<String> {
     let cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
-    if let Ok(output) = Command::new(cmd).arg("claude").output() {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().lines().next().unwrap_or("").to_string();
-            if !path.is_empty() {
-                return Some(path);
-            }
+    if let Ok(output) = Command::new(cmd).arg("claude").output()
+        && output.status.success()
+    {
+        let path = String::from_utf8_lossy(&output.stdout).trim().lines().next().unwrap_or("").to_string();
+        if !path.is_empty() {
+            return Some(path);
         }
     }
 
@@ -223,12 +251,12 @@ fn find_claude() -> Option<String> {
 }
 
 fn get_claude_version() -> Option<String> {
-    if let Ok(output) = Command::new("claude").arg("--version").output() {
-        if output.status.success() {
-            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !version.is_empty() {
-                return Some(version);
-            }
+    if let Ok(output) = Command::new("claude").arg("--version").output()
+        && output.status.success()
+    {
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !version.is_empty() {
+            return Some(version);
         }
     }
     None

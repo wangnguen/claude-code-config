@@ -59,10 +59,10 @@ fn run_line(line: &str) {
 
     match Cli::try_parse_from(args) {
         Ok(cli) => {
-            if let Some(command) = cli.command {
-                if let Err(err) = crate::dispatch(command) {
-                    eprintln!("{}", style(format!("{err:#}")).red());
-                }
+            if let Some(command) = cli.command
+                && let Err(err) = crate::dispatch(command)
+            {
+                eprintln!("{}", style(format!("{err:#}")).red());
             }
         }
         Err(err) => {

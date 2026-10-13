@@ -1,6 +1,10 @@
 mod api;
+mod checks;
 mod commands;
 mod config;
+mod keys;
+mod project;
+mod slots;
 mod tui;
 mod ui;
 mod utils;
@@ -29,7 +33,12 @@ pub enum Commands {
     /// Show the current version
     Version,
     /// Copy default .claude config to current directory
-    Init,
+    Init {
+        /// Point the copy at another Anthropic-compatible gateway and fit the
+        /// models to what it lists
+        #[arg(long, value_name = "URL")]
+        base_url: Option<String>,
+    },
     /// Copy .claude config with lite proxy env (prompts for auth token)
     Lite,
     /// Show config (default: global)
@@ -58,8 +67,13 @@ pub enum Commands {
     Doctor,
     /// Test API connection with current key
     Check,
-    /// List the models the current key can reach on the gateway
-    Models,
+    /// List the models your key can use, or choose this folder's models
+    Models {
+        #[command(subcommand)]
+        subcmd: Option<commands::models::ModelsCmd>,
+    },
+    /// Open the full-screen manager: keys, models, config and checks
+    Ui,
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -83,7 +97,7 @@ fn restore_sigpipe() {}
 pub fn dispatch(command: Commands) -> Result<()> {
     match command {
         Commands::Version => commands::version::run(),
-        Commands::Init => commands::init::run()?,
+        Commands::Init { base_url } => commands::init::run(base_url)?,
         Commands::Lite => commands::lite::run()?,
         Commands::Show { target } => commands::show::run(target.unwrap_or(ShowTarget::Global))?,
         Commands::Key { subcmd } => commands::key::run(subcmd)?,
@@ -93,7 +107,8 @@ pub fn dispatch(command: Commands) -> Result<()> {
         Commands::Uninstall => commands::uninstall::run()?,
         Commands::Doctor => commands::doctor::run()?,
         Commands::Check => commands::check::run()?,
-        Commands::Models => commands::models::run()?,
+        Commands::Models { subcmd } => commands::models::run(subcmd)?,
+        Commands::Ui => tui::run(tui::Screen::Home)?,
         Commands::Completions { shell } => commands::completions::run(shell),
     }
     Ok(())

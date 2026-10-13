@@ -1,54 +1,53 @@
-use crossterm::{
-    event::{self, Event, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::prelude::*;
-use std::io::stdout;
+use std::io::{stdin, stdout, IsTerminal};
+use std::time::Duration;
 
-use super::app::App;
+use anyhow::{bail, Result};
+use crossterm::event::{self, Event, KeyEventKind};
+use ratatui::DefaultTerminal;
 
-pub fn run_key_tui() {
-    if enable_raw_mode().is_err() { return; }
-    let mut stdout = stdout();
-    if execute!(stdout, EnterAlternateScreen).is_err() {
-        disable_raw_mode().ok();
-        return;
+use super::app::{App, Screen};
+
+/// Open the full-screen manager on `screen` and run it until the user leaves.
+pub fn run(screen: Screen) -> Result<()> {
+    if !stdout().is_terminal() || !stdin().is_terminal() {
+        bail!(
+            "This screen needs an interactive terminal. Use the plain commands instead: \
+             'ccc key list|add|use', 'ccc models' and 'ccc models set <slot> <model>'."
+        );
     }
 
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = match Terminal::new(backend) {
-        Ok(t) => t,
-        Err(_) => { disable_raw_mode().ok(); return; }
-    };
+    // try_init also installs a panic hook that restores the terminal, so a bug
+    // can never leave the shell stuck in raw mode on the alternate screen.
+    let mut terminal = ratatui::try_init()?;
+    let result = event_loop(&mut terminal, screen);
+    ratatui::try_restore()?;
+    result
+}
 
-    let mut app = App::new();
-
+fn event_loop(terminal: &mut DefaultTerminal, screen: Screen) -> Result<()> {
+    let mut app = App::new(screen);
     loop {
-        app.poll_status();
-        terminal.draw(|f| app.render(f, f.area())).ok();
-        if app.should_quit { break; }
+        app.tick();
+        terminal.draw(|frame| app.render(frame))?;
+        if app.should_quit {
+            return Ok(());
+        }
 
-        let timeout = if app.has_pending_status() {
-            std::time::Duration::from_millis(50)
+        // Redraw often while a spinner turns, otherwise only on input.
+        let timeout = if app.busy() {
+            Duration::from_millis(80)
         } else {
-            std::time::Duration::from_secs(60)
+            Duration::from_secs(1)
         };
-
-        if !event::poll(timeout).unwrap_or(false) { continue; }
-
-        let event = match event::read() {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-
-        if let Event::Key(key) = event {
-            if key.kind != KeyEventKind::Press { continue; }
-            app.handle_event(key.code);
+        if !event::poll(timeout)? {
+            continue;
+        }
+        // Resize and other events need nothing but the redraw at the top.
+        // Windows reports key releases too; only presses count.
+        if let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            app.handle_key(key);
         }
     }
-
-    disable_raw_mode().ok();
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
-    terminal.show_cursor().ok();
 }

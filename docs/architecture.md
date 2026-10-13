@@ -9,19 +9,23 @@ ccc/
 │
 ├── src/                        Toàn bộ mã nguồn
 │   ├── main.rs                 Điểm vào. Định nghĩa CLI, điều hướng sang lệnh
-│   ├── config.rs               Đường dẫn file, đọc/ghi JSON, hằng số, KeysStore
-│   ├── api.rs                  Gọi gateway: lấy danh sách model, kiểm tra key
+│   ├── config.rs               Đường dẫn file, đọc/ghi JSON, hằng số, KeysStore, CccSettings
+│   ├── api.rs                  Gọi gateway: lấy danh sách model, kiểm tra key, bộ lọc model
+│   ├── slots.rs                Các slot model: đọc/ghi, gợi ý model, quy tắc [1m] (không I/O)
+│   ├── checks.rs               Các bước của `ccc check` dưới dạng dữ liệu (CLI và TUI dùng chung)
+│   ├── keys.rs                 Thao tác với key: add/default/use/remove/rename (CLI và TUI dùng chung)
+│   ├── project.rs              Tình trạng thư mục hiện tại: key, gateway, slot, discovery
 │   ├── ui.rs                   Hàm vẽ khung, dòng kẻ, dấu tick cho terminal
 │   ├── utils.rs                Hàm dùng chung: nhập liệu, copy thư mục, che key
 │   │
 │   ├── commands/               Mỗi file = một lệnh con của `ccc`
 │   │   ├── mod.rs              Khai báo các file trong thư mục này
 │   │   ├── lite.rs             `ccc lite`
-│   │   ├── init.rs             `ccc init`
+│   │   ├── init.rs             `ccc init [--base-url]`
 │   │   ├── key.rs              `ccc key ...`
 │   │   ├── config.rs           `ccc config ...`
-│   │   ├── check.rs            `ccc check`
-│   │   ├── models.rs           `ccc models`
+│   │   ├── check.rs            `ccc check` (in báo cáo của checks.rs)
+│   │   ├── models.rs           `ccc models [list|pick|set]`
 │   │   ├── doctor.rs           `ccc doctor`
 │   │   ├── permission.rs       `ccc permission`
 │   │   ├── show.rs             `ccc show`
@@ -32,23 +36,25 @@ ccc/
 │   │   ├── version.rs          `ccc version`
 │   │   └── completions.rs      `ccc completions`
 │   │
-│   └── tui/                    Giao diện toàn màn hình
+│   └── tui/                    Giao diện toàn màn hình (`ccc ui`, `ccc key`, `ccc models pick`)
 │       ├── mod.rs
-│       ├── app.rs              Bộ điều phối: giữ state, xử lý sự kiện, vẽ
-│       ├── component.rs        Định nghĩa Action / KeyOp / ModeSwitch
-│       ├── event.rs            Vòng lặp đọc phím
-│       ├── input.rs            Ô nhập liệu
-│       ├── theme.rs            Màu sắc, icon
-│       └── components/         Các thành phần giao diện
-│           ├── home.rs             Màn hình chính
-│           ├── dashboard.rs        Bảng tổng quan key
-│           ├── key_table.rs        Bảng danh sách key
-│           ├── status_dashboard.rs Màn hình kiểm tra key
-│           ├── input_modal.rs      Hộp thoại nhập
-│           ├── confirm_modal.rs    Hộp thoại xác nhận
-│           ├── header.rs
-│           ├── footer.rs
-│           └── toast.rs            Thông báo ngắn
+│       ├── app.rs              Bộ điều phối: Screen, Action, overlay, test vẽ màn hình
+│       ├── event.rs            Mở/đóng terminal, vòng lặp đọc phím
+│       ├── input.rs            Ô nhập liệu (theo char, an toàn với tiếng Việt)
+│       ├── theme.rs            Màu sắc, ký hiệu một cột
+│       ├── widgets.rs          Khung trang, thanh phím tắt, cắt chữ theo độ rộng
+│       ├── screens/            Mỗi file = một màn
+│       │   ├── home.rs             Tình trạng thư mục, Getting started, menu
+│       │   ├── keys.rs             Bảng key + chi tiết key đang chọn
+│       │   ├── models.rs           Chọn model cho từng slot (lấy danh sách ở thread riêng)
+│       │   ├── config.rs           Config Claude Code đọc ở thư mục này
+│       │   ├── check.rs            Báo cáo của checks.rs
+│       │   ├── status.rs           Test tất cả key song song
+│       │   └── help.rs             Bảng `?`
+│       └── components/         Hộp thoại dùng chung
+│           ├── input_modal.rs      Hộp nhập (có chế độ ẩn cho key)
+│           ├── confirm_modal.rs    Hộp hỏi y/n
+│           └── toast.rs            Thông báo kết quả
 │
 ├── default/.claude/            Config mẫu, đóng gói kèm binary
 │   └── settings.local.json     KHÔNG BAO GIỜ chứa API key — file này lên git
@@ -68,6 +74,7 @@ Có ba nơi chứa trạng thái, dễ nhầm lẫn nhất trong repo này:
 ~/.ccc/                             ← "nhà" của ccc
 ├── ccc.exe                             binary
 ├── keys.json                           kho key: { active, keys: {tên: giá trị} }
+├── ccc.json                            tuỳ chọn của ccc: { model_filter } (có thể chưa có)
 └── .claude/
     └── settings.local.json             config MẪU (Claude Code KHÔNG đọc file này)
 
@@ -116,21 +123,26 @@ nhau.
        ↓
 3. Hỏi virtual key (nhập ẩn)
        ↓
-4. Copy ~/.ccc/.claude/  →  ./.claude/
+4. GET {gateway team}/v1/models bằng key đó
+       ↓  (gateway từ chối key → dừng, không ghi gì;
+       ↓   không liên lạc được → cảnh báo, đi tiếp với model mặc định)
+5. Copy ~/.ccc/.claude/  →  ./.claude/
        ↓
-5. Đọc ./.claude/settings.local.json, ghi thêm vào phần "env":
+6. Đọc ./.claude/settings.local.json, ghi thêm vào phần "env":
        - ANTHROPIC_BASE_URL
        - ANTHROPIC_AUTH_TOKEN          (và xoá ANTHROPIC_API_KEY)
        - CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1"
-       - 5 biến model, tất cả đều là tên -vn
+       - 4 slot model (LITE_MODELS) + ANTHROPIC_SMALL_FAST_MODEL = slot Haiku
+       - slots::fit(): slot nào key không dùng được thì đổi sang model gần nhất
        ↓
-6. Thêm ".claude/settings.local.json" vào .gitignore nếu là git repo
+7. Thêm ".claude/settings.local.json" vào .gitignore nếu là git repo
    (bỏ qua nếu .gitignore đã che file đó, hoặc đã che cả .claude/)
 ```
 
-Bước 5 phải pin **đủ cả 5 biến model**. Bỏ trống biến nào thì Claude Code rơi về
-id built-in tương ứng và nhận 403. Điều này áp dụng cả cho
-`ANTHROPIC_SMALL_FAST_MODEL` — biến dùng cho các việc chạy nền.
+Bước 6 phải điền **đủ 4 slot bắt buộc** (main, sonnet, opus, haiku). Bỏ trống
+slot nào thì alias tương ứng trong `/model` rơi về id built-in và nhận 403.
+`ANTHROPIC_SMALL_FAST_MODEL` đã deprecated nhưng vẫn được ghi cho Claude Code bản
+cũ, luôn bằng slot Haiku (`slots::write` tự đồng bộ).
 
 ## Luồng kiểm tra key
 
@@ -170,14 +182,25 @@ App::process_action(action)
 `Action` mô tả việc cần làm. Chỉ `App` mới thực sự ghi file, sửa `KeysStore`, đổi
 màn hình. Nhờ vậy mọi thay đổi trạng thái đều tập trung ở một chỗ, dễ theo dõi.
 
-`Mode` là enum liệt kê các màn hình có thể có
-(xem [`src/tui/app.rs`](../src/tui/app.rs)):
+`Screen` là enum các màn (xem [`src/tui/app.rs`](../src/tui/app.rs)); trên mỗi
+màn có thể có một overlay:
 
 ```
-Home  →  KeyDashboard  →  Normal (bảng key)
-                              ↓
-              AddName / AddValue / Rename / ConfirmRemove / Status / Message
+Home ─┬─ Keys ──── (s) Test every key
+      ├─ Models    (lấy danh sách model ở thread riêng, poll mỗi lần vẽ)
+      ├─ Config
+      └─ Check     (chạy checks::run() ở thread riêng)
+
+Overlay: Input (thêm/đổi tên key, model Custom) · Confirm (y/n) · Toast · Help (?)
 ```
+
+Mọi màn vẽ trong `widgets::page()`: khung, tiêu đề, và thanh phím tắt ở dòng cuối.
+Thanh phím tắt bỏ bớt mục từ cuối khi hết chỗ nhưng luôn giữ `? help`. Chữ không
+vừa thì cắt có dấu "…" theo độ rộng hiển thị, không bao giờ bị viền cắt mất.
+
+TUI có test vẽ bằng `TestBackend` (cuối `app.rs` và `screens/models.rs`): mọi
+màn được vẽ ở 64×20, 80×24, 100×30, 160×48 và kiểm tra viền liền, còn `? help`,
+key không bị lộ.
 
 ## Quy tắc cần giữ
 
@@ -185,13 +208,19 @@ Home  →  KeyDashboard  →  Normal (bảng key)
    được git theo dõi, key lọt vào là lên GitHub.
 2. **Mọi giá trị bí mật phải qua `mask_key()` hoặc `redact_secrets()` trước khi in.**
 3. **Không ghi `ANTHROPIC_API_KEY` mới.** Dùng `set_auth_token()`.
-4. **Tên model phải kết thúc bằng `-vn`**, có thể theo sau bởi marker context
-   `[1m]` (vd `claude-sonnet-5-vn[1m]`). Hàm `is_vn_model()` trong `api.rs` là
-   nơi kiểm tra điều này.
+4. **"Model dùng được" = gateway liệt kê cho key + qua bộ lọc.** Bộ lọc là `-vn`
+   trên gateway của team, không lọc với gateway khác, hoặc giá trị
+   `model_filter` trong `~/.ccc/ccc.json`. Dùng `api::model_filter_for()`,
+   `api::matches_filter()` và `api::usable_models()`; đừng tự so hậu tố.
 5. **Mọi so sánh với danh sách model của gateway phải đi qua `base_model_id()`.**
    Marker `[1m]` là client-side, gateway không bao giờ trả về tên có ngoặc vuông
    — so khớp nguyên chuỗi sẽ báo lệch giả.
 6. **Model mặc định nằm ở hai nơi và phải khớp nhau:**
-   `default/.claude/settings.local.json` (file `ccc init` copy) và các hằng
-   `LITE_*` trong `commands/lite.rs` (ghi đè file đó khi chạy `ccc lite`). Sửa
-   một chỗ mà quên chỗ kia thì `ccc lite` sẽ âm thầm revert.
+   `default/.claude/settings.local.json` (file `ccc init` copy) và mảng
+   `LITE_MODELS` trong `commands/lite.rs` (ghi đè file đó khi chạy `ccc lite`).
+   Test `lite_defaults_match_the_shipped_template` sẽ fail nếu hai nơi lệch nhau.
+7. **Slot model chỉ đọc/ghi qua `slots.rs`** (`slots::read`, `slots::write`,
+   `slots::fit`), để biến legacy `ANTHROPIC_SMALL_FAST_MODEL` luôn theo slot Haiku.
+8. **TUI không in ra stdout.** Trong lúc TUI chiếm màn hình, mọi thông báo đi qua
+   Toast; vì vậy có `utils::ensure_local_settings_ignored()` (trả về chuỗi) bên
+   cạnh `ignore_local_settings()` (in ra).

@@ -1,8 +1,10 @@
 mod app;
-mod component;
 mod components;
 mod event;
 mod input;
+mod screens;
 mod theme;
+mod widgets;
 
-pub use event::run_key_tui;
+pub use app::Screen;
+pub use event::run;

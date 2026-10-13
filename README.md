@@ -1,6 +1,8 @@
 # ccc - Claude Code Config CLI
 
-Quick setup tool for Claude Code configuration, with a built-in interactive TUI key manager.
+Quick setup tool for Claude Code configuration: API keys, the model each
+Claude Code slot uses, and a check that the gateway agrees — from the command
+line or a full-screen terminal UI.
 
 ## Install
 
@@ -20,17 +22,32 @@ curl -fsSL https://raw.githubusercontent.com/wangnguen/claude-code-config/main/i
 
 Download binary from [Releases](https://github.com/wangnguen/claude-code-config/releases), place it in a folder and add to PATH.
 
+## Quick start
+
+```bash
+cd my-project
+ccc lite      # asks for your virtual key, checks it, writes .claude/settings.local.json
+ccc check     # everything should pass
+```
+
+Or do it all from the full-screen UI: `ccc ui`, then follow **Getting started**
+on the Home screen.
+
 ## Usage
 
 ```bash
 # Interactive shell: type commands without the `ccc` prefix
 ccc
 
-# Set up this project against the LiteLLM gateway (prompts for your virtual key)
+# Full-screen manager: keys, models, config and checks
+ccc ui
+
+# Set up this project against the team's LiteLLM gateway (prompts for your key)
 ccc lite
 
 # Init .claude config in current project (auto-applies default key)
 ccc init
+ccc init --base-url https://my-gateway.example.com   # another gateway
 
 # Show current local config
 ccc show config
@@ -41,11 +58,18 @@ ccc show global
 # Install/update Claude Code permissions in ./.claude/settings.local.json
 ccc permission   # or: ccc p
 
-# Check API connection, model discovery, and pinned models
+# Check the key, model discovery, and every model slot against the gateway
 ccc check
 
-# List the models your key can reach on the gateway
+# List the models your key can use, and which slots use them
 ccc models
+
+# Choose this folder's models (full-screen picker)
+ccc models pick
+
+# Set one slot directly (checked against the gateway first)
+ccc models set opus claude-opus-5-vn
+ccc models set sonnet 'claude-sonnet-5-vn[1m]'
 
 # Check environment and config status
 ccc doctor
@@ -60,10 +84,30 @@ ccc uninstall
 ccc version
 ```
 
+## Model slots
+
+Claude Code reads one model per slot from `env` in
+`.claude/settings.local.json`. `ccc models pick` and `ccc models set` fill them:
+
+| Slot | Variable | What it is |
+|---|---|---|
+| `main` | `ANTHROPIC_MODEL` | The model a session starts with |
+| `sonnet` | `ANTHROPIC_DEFAULT_SONNET_MODEL` | What `sonnet` in `/model` resolves to |
+| `opus` | `ANTHROPIC_DEFAULT_OPUS_MODEL` | What `opus` resolves to (also `opusplan`) |
+| `haiku` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | What `haiku` resolves to; also runs background tasks |
+| `custom` | `ANTHROPIC_CUSTOM_MODEL_OPTION` | Optional: one extra `/model` entry, any id |
+
+`ANTHROPIC_SMALL_FAST_MODEL` is deprecated in Claude Code. ccc still writes it
+for older versions, always equal to the Haiku slot.
+
+Only models the gateway lists for your key are offered, so a picked model
+cannot fail with a 403.
+
 ## Gateway models (`-vn`)
 
 Requests go through a LiteLLM proxy, and each person gets their own virtual API
-key. That key is only entitled to the models whose name ends in `-vn`:
+key. On the team gateway that key is only entitled to the models whose name
+ends in `-vn`:
 
 ```
 claude-opus-5-vn
@@ -73,21 +117,52 @@ claude-opus-4-8-vn
 claude-sonnet-4-6-vn
 ```
 
+`ccc models` shows the current list for your key.
+
 The names without the suffix are Claude Code's built-in list. Selecting one
 fails with `403 key not allowed to access model` — they are different model
 ids, not a permission you can be granted.
 
-Two consequences worth knowing:
+What matters, and what does not:
 
-- `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` is required, otherwise the
-  model picker only offers built-ins. `ccc lite` writes it for you.
-- Every `ANTHROPIC_*MODEL` variable must be pinned to a `-vn` name, including
-  `ANTHROPIC_SMALL_FAST_MODEL`. Leaving one unset is not safe: Claude Code then
-  falls back to a built-in id and fails the same way.
+- **Every required slot must be set to a `-vn` model.** An unset slot makes
+  the matching `/model` alias fall back to a built-in id, which fails with 403.
+- **Model discovery is recommended, not required.**
+  `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` makes `/model` list the
+  gateway's real model names. With it off, `/model` shows only the aliases
+  (`default`, `sonnet`, `opus`, `haiku`, …) — and those still work, because each
+  alias resolves to its slot. `ccc lite` turns discovery on; `g` in the model
+  picker toggles it.
+- Discovery only lists ids that contain `claude` or `anthropic`. Any other id
+  works when set in a slot, but cannot be picked from `/model` by name.
+
+## Other gateways and the model filter
+
+ccc is not tied to the team gateway. The rule for which models count as usable
+depends on the gateway:
+
+| Gateway | Filter | Usable models |
+|---|---|---|
+| The team gateway | `-vn` | Listed models ending in `-vn` |
+| Any other | none | Everything the gateway lists for the key |
+
+Override it with `ccc config set model_filter <suffix>`, turn it off with
+`ccc config set model_filter none`, and go back to the default with
+`ccc config set model_filter auto`.
+
+To point a project at another Anthropic-compatible gateway:
+
+```bash
+ccc init --base-url https://my-gateway.example.com
+```
+
+ccc then asks that gateway for its models and fits every slot to them. The
+gateway must speak the Anthropic Messages API (`/v1/messages`); Anthropic does
+not support Claude Code on non-Claude models through a gateway.
 
 ## 1M context (`[1m]`)
 
-A `-vn` name may carry a `[1m]` marker to select the 1M-context variant:
+A model name may carry a `[1m]` marker to select the 1M-context variant:
 
 ```
 claude-sonnet-5-vn[1m]
@@ -100,18 +175,19 @@ never lists a name with brackets, and a config value like
 `claude-sonnet-5-vn[1m]` matching a gateway model `claude-sonnet-5-vn` is
 correct, not a mismatch.
 
-Only Sonnet and Opus have a 1M variant. Haiku 4.5 does not, so
-`ANTHROPIC_SMALL_FAST_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL` stay bare.
+Only Sonnet and Opus have a 1M variant. Haiku 4.5 does not, so the Haiku slot
+stays bare; ccc refuses `[1m]` on it. In the picker, `1` toggles 1M for the
+selected slot.
 
 The marker goes *after* the `-vn` suffix, never before: `claude-sonnet-5-vn[1m]`
 is right, `claude-sonnet-5[1m]-vn` is not a model id.
 
 `ccc lite` defaults to `claude-sonnet-5-vn[1m]` for the main and Sonnet slots,
-`claude-opus-5-vn[1m]` for Opus, and `claude-haiku-4-5-vn` for the fast slot.
+`claude-opus-5-vn[1m]` for Opus, and `claude-haiku-4-5-vn` for Haiku. Before
+writing, it checks them against your key's list and swaps any your key cannot
+use for the closest model it can.
 
-Run `ccc check` to verify all of this at once, and `ccc models` to see the list.
-
-If `-vn` models do not appear, something with higher priority is overriding the
+If the models do not show up, something with higher priority is overriding the
 config. In order, highest first: managed policy (`managed-settings.json`),
 command-line flags, `.claude/settings.local.json` in the project,
 `.claude/settings.json`, then `~/.claude/settings.json`. Shell environment
@@ -120,40 +196,52 @@ variables also win over settings files. `ccc doctor` reports the ones it can see
 Note that `~/.ccc/.claude/settings.local.json` is only the template `ccc init`
 copies — Claude Code never reads it.
 
-### Key Management
+## Full-screen UI
 
-#### Interactive TUI (recommended)
+`ccc ui` opens on **Home**; `ccc key` opens on **Keys**; `ccc models pick` opens
+on **Models**. Every screen lists its keys on the bottom line, and `?` shows
+all of them with a short explanation. `Esc` goes back, `q` quits.
 
-```bash
-ccc key
-```
+| Screen | What it does |
+|---|---|
+| Home | Where this folder stands (key, gateway, models), the four getting-started steps, and the way to each screen |
+| Keys | Saved keys, which is the default (`★`) and which this folder uses (`●`) |
+| Models | Pick a model for each slot from the gateway's list for the key |
+| Config | What Claude Code reads in this folder, secrets masked |
+| Check | The same checks as `ccc check` |
 
-Opens a full-screen terminal UI with:
-
-- **Key table** — navigate with `↑↓` or `j/k`, default key marked with `★`
-- **Modal dialogs** — inline input for add/rename, confirmation for remove
-- **Status dashboard** — full-screen view with progress bar, API info, and live results
-- **Toast notifications** — instant feedback for all operations
-
-**Keyboard shortcuts:**
+**Keys:**
 
 | Key | Action |
 |-----|--------|
-| `a` | Add a new key (modal input) |
-| `d` | Set highlighted key as default |
-| `u` | Use highlighted key for current folder |
-| `r` | Remove highlighted key (with confirmation) |
-| `n` | Rename highlighted key (modal input) |
-| `s` | Check all keys status (full-screen dashboard) |
-| `q` / `Esc` | Quit |
+| `a` | Add a key (name, then the key; input is hidden) |
+| `u` | Use the highlighted key in this folder |
+| `d` | Make it the default for new folders |
+| `m` | Pick this folder's models using this key |
+| `s` | Test every saved key against the gateway |
+| `n` / `r` | Rename / remove (asks first) |
 
-#### CLI commands
+**Models:**
 
-All key operations are also available as direct CLI commands:
+| Key | Action |
+|-----|--------|
+| `↑↓` | Move between slots (or models, once inside the list) |
+| `→` / `Enter` | Choose a model for the slot |
+| `w` / `Ctrl-S` | Save to `.claude/settings.local.json` |
+| `f` | Fill empty or unusable slots automatically |
+| `1` | 1M context on/off (Sonnet and Opus) |
+| `g` | Discovery on/off |
+| `e` / `x` | Type / clear the Custom model |
+| `r` | Reload the list |
+
+Leaving with unsaved picks asks first. When the models were checked with a key
+this folder does not use yet, saving offers to use that key here too.
+
+## Key management from the command line
 
 ```bash
-# Add a new key
-ccc key add <name> <value>
+# Add a new key (prompts, hidden, when the value is left out)
+ccc key add <name> [value]
 
 # List all saved keys
 ccc key list
@@ -177,4 +265,3 @@ ccc key status
 **default** vs **use**:
 - `ccc key default` — sets which key is the global default (stored in `~/.ccc/keys.json`). Used automatically when running `ccc init`.
 - `ccc key use` — applies a key to the current project folder (writes to `.claude/settings.local.json`).
-

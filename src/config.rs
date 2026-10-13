@@ -15,16 +15,8 @@ pub const ENV_AUTH_TOKEN: &str = "ANTHROPIC_AUTH_TOKEN";
 pub const ENV_API_KEY: &str = "ANTHROPIC_API_KEY";
 /// Makes Claude Code ask the gateway which models the key may use.
 pub const ENV_GATEWAY_DISCOVERY: &str = "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY";
-
-/// Every variable that pins a model name. All of them must resolve to a model
-/// the key is entitled to, including the small/fast one used for background work.
-pub const MODEL_ENV_KEYS: &[&str] = &[
-    "ANTHROPIC_MODEL",
-    "ANTHROPIC_SMALL_FAST_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-];
+/// Where Claude Code sends its requests.
+pub const ENV_BASE_URL: &str = "ANTHROPIC_BASE_URL";
 
 pub fn ccc_home() -> Result<PathBuf> {
     let home = if cfg!(target_os = "windows") {
@@ -54,6 +46,11 @@ pub fn keys_path() -> Result<PathBuf> {
     Ok(ccc_home()?.join("keys.json"))
 }
 
+/// ccc's own preferences, as opposed to the Claude Code settings it writes.
+pub fn ccc_settings_path() -> Result<PathBuf> {
+    Ok(ccc_home()?.join("ccc.json"))
+}
+
 /// The settings Claude Code actually reads in this folder. Falls back to ccc's
 /// own template, which Claude Code never reads — callers should say which one
 /// they got so nobody edits the template expecting it to take effect.
@@ -63,6 +60,29 @@ pub fn effective_settings_path() -> Option<(PathBuf, bool)> {
         return Some((local, true));
     }
     default_settings_path().ok().filter(|p| p.exists()).map(|p| (p, false))
+}
+
+/// An env value from the settings Claude Code reads in this folder, falling
+/// back to ccc's template for folders that only carry part of the config
+/// (`ccc key use` in a fresh folder writes the token and nothing else).
+pub fn setting_env(name: &str) -> Option<String> {
+    let mut candidates = vec![local_settings_path()];
+    if let Ok(template) = default_settings_path() {
+        candidates.push(template);
+    }
+    candidates
+        .iter()
+        .filter(|path| path.exists())
+        .find_map(|path| env_value(&read_json_or_default(path), name))
+}
+
+/// A non-empty string under `env` in a settings JSON.
+pub fn env_value(json: &Value, name: &str) -> Option<String> {
+    json["env"][name]
+        .as_str()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
 }
 
 pub fn read_json(path: &Path) -> Result<Value> {
@@ -91,6 +111,53 @@ pub fn write_json(path: &Path, value: &Value) -> Result<()> {
         .context("Failed to serialize JSON")?;
     fs::write(path, pretty)
         .with_context(|| format!("Failed to write {}", path.display()))
+}
+
+/// Read this folder's `.claude/settings.local.json` for a change, creating the
+/// folder when needed. Missing or unreadable files start from `{}` so a broken
+/// file never blocks a fix, but the caller writes the whole object back.
+pub fn load_local_for_edit() -> Result<(PathBuf, Value)> {
+    let path = local_settings_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    let json = if path.exists() {
+        read_json_or_default(&path)
+    } else {
+        Value::Object(serde_json::Map::new())
+    };
+    Ok((path, json))
+}
+
+// ccc preferences: { "model_filter": "-vn" }
+#[derive(Serialize, Deserialize, Default)]
+pub struct CccSettings {
+    /// Suffix a model id must end with to count as usable. `None` means "pick
+    /// from the gateway": `-vn` for the team gateway, nothing for any other.
+    /// An empty string switches filtering off everywhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_filter: Option<String>,
+}
+
+impl CccSettings {
+    pub fn load() -> Self {
+        ccc_settings_path()
+            .ok()
+            .filter(|p| p.exists())
+            .and_then(|p| read_json(&p).ok())
+            .and_then(|json| serde_json::from_value(json).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let path = ccc_settings_path()?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).ok();
+        }
+        let value = serde_json::to_value(self).context("Failed to serialize ccc settings")?;
+        write_json(&path, &value)
+    }
 }
 
 // Keys store: { active: "name", keys: { "name": "sk-..." } }
@@ -129,5 +196,11 @@ impl KeysStore {
 
     pub fn get_active_key(&self) -> Option<&String> {
         self.active.as_ref().and_then(|a| self.keys.get(a))
+    }
+
+    /// The saved name for a key value, so screens can say "work" rather than
+    /// a masked token nobody recognises.
+    pub fn name_of(&self, value: &str) -> Option<&String> {
+        self.keys.iter().find(|(_, v)| v.as_str() == value).map(|(name, _)| name)
     }
 }

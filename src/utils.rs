@@ -24,10 +24,18 @@ pub fn prompt_secret(message: &str) -> Result<String> {
 /// No-op when there is no .gitignore, or when the file is already covered
 /// (by its own entry, or by a broader .claude/ entry someone added before).
 pub fn ignore_local_settings() {
+    if let Some(message) = ensure_local_settings_ignored() {
+        println!("{message}");
+    }
+}
+
+/// The work behind `ignore_local_settings`, without printing: the TUI cannot
+/// write to stdout while it owns the screen. Returns what changed, if anything.
+pub fn ensure_local_settings_ignored() -> Option<String> {
     let path = Path::new(".gitignore");
     // Only touch git repos; elsewhere a stray .gitignore would be noise.
     if !path.exists() && !Path::new(".git").exists() {
-        return;
+        return None;
     }
     let target = format!(".claude/{SETTINGS_FILE}");
     let content = fs::read_to_string(path).unwrap_or_default();
@@ -37,12 +45,12 @@ pub fn ignore_local_settings() {
         entry == target || matches!(entry, ".claude/" | ".claude")
     });
     if already_ignored {
-        return;
+        return None;
     }
-    let sep = if content.ends_with('\n') { "" } else { "\n" };
-    if fs::write(path, format!("{content}{sep}{target}\n")).is_ok() {
-        println!("Added '{target}' to .gitignore (it now contains your key).");
-    }
+    let sep = if content.is_empty() || content.ends_with('\n') { "" } else { "\n" };
+    fs::write(path, format!("{content}{sep}{target}\n"))
+        .ok()
+        .map(|_| format!("Added '{target}' to .gitignore (it now contains your key)."))
 }
 
 pub fn prompt(message: &str) -> Result<String> {

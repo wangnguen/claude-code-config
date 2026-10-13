@@ -45,6 +45,39 @@ id model khác, không tồn tại trên gateway. Luôn chọn tên có `-vn`.
 
 Hậu tố viết **thường** (`-vn`), không phải `-VN`.
 
+Danh sách trên chỉ là ví dụ; gateway có thể thêm model mới bất cứ lúc nào.
+`ccc models` luôn cho thấy danh sách hiện tại của key bạn.
+
+## Các slot model
+
+Claude Code đọc model cho từng "slot" từ phần `env` của
+`.claude/settings.local.json`:
+
+| Slot | Biến | Ý nghĩa |
+|---|---|---|
+| `main` | `ANTHROPIC_MODEL` | Model khi mở phiên mới |
+| `sonnet` | `ANTHROPIC_DEFAULT_SONNET_MODEL` | Alias `sonnet` trong `/model` trỏ tới đây |
+| `opus` | `ANTHROPIC_DEFAULT_OPUS_MODEL` | Alias `opus` (và `opusplan`) |
+| `haiku` | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Alias `haiku`, đồng thời chạy các tác vụ nền |
+| `custom` | `ANTHROPIC_CUSTOM_MODEL_OPTION` | Không bắt buộc: thêm 1 dòng tuỳ ý vào `/model` |
+
+`ANTHROPIC_SMALL_FAST_MODEL` đã bị Claude Code đánh dấu deprecated. `ccc` vẫn
+ghi nó cho các bản Claude Code cũ, luôn bằng giá trị slot Haiku.
+
+Bốn slot đầu **phải có giá trị** là model key bạn dùng được. Slot nào để trống
+thì alias tương ứng rơi về id built-in và nhận 403.
+
+## Model discovery: nên bật, không bắt buộc
+
+`CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` khiến `/model` liệt kê tên model
+thật lấy từ gateway. Tắt đi thì `/model` chỉ hiện các alias (`default`,
+`sonnet`, `opus`, `haiku`, …) — **vẫn dùng được bình thường**, vì mỗi alias trỏ
+tới slot tương ứng ở trên. Điều kiện thật sự để không bị 403 là đủ các slot,
+không phải discovery.
+
+Lưu ý: discovery chỉ giữ những id có chữ `claude` hoặc `anthropic`. Model tên
+khác vẫn chạy nếu đặt vào slot, nhưng không chọn được theo tên trong `/model`.
+
 ## 1M context (`[1m]`)
 
 Tên model `-vn` có thể mang thêm marker `[1m]` để chọn bản context 1 triệu token:
@@ -97,10 +130,13 @@ ccc lite
 Lệnh này sẽ:
 
 1. Hỏi virtual key của bạn (nhập ẩn, không hiện ra màn hình)
-2. Copy thư mục `.claude/` mẫu vào project
-3. Ghi `.claude/settings.local.json` với base URL của LiteLLM, key của bạn, bật
-   model discovery, và pin sẵn 5 biến model sang tên `-vn`
-4. Thêm `.claude/settings.local.json` vào `.gitignore` nếu project là git repo
+2. Hỏi gateway danh sách model của key đó. Gateway từ chối key thì dừng luôn,
+   **không ghi gì**; gateway không liên lạc được thì vẫn tiếp tục với model mặc định
+3. Copy thư mục `.claude/` mẫu vào project
+4. Ghi `.claude/settings.local.json` với base URL của LiteLLM, key của bạn, bật
+   model discovery, và điền các slot model bằng tên `-vn`. Model mặc định nào
+   key không dùng được thì tự đổi sang model gần nhất mà key có
+5. Thêm `.claude/settings.local.json` vào `.gitignore` nếu project là git repo
 
 Sau đó kiểm tra:
 
@@ -108,13 +144,17 @@ Sau đó kiểm tra:
 ccc check
 ```
 
-Tất cả phải pass. Rồi khởi động lại Claude Code và mở `/model` — phải thấy các
-model `-vn` với nhãn "From gateway".
+Tất cả phải pass (dòng vàng 🟡 là lưu ý, không phải lỗi). Rồi khởi động lại
+Claude Code và mở `/model` — phải thấy các model `-vn` với nhãn "From gateway".
+
+Muốn đổi model sau này: `ccc models pick`.
 
 ## Chế độ tương tác
 
-Gõ `ccc` không kèm lệnh sẽ mở dấu nhắc tương tác: banner ở trên, danh sách lệnh
-hay dùng bên phải, rồi vòng lặp `›` để gõ lệnh mà không cần lặp lại `ccc`.
+Gõ `ccc` không kèm lệnh sẽ mở dấu nhắc tương tác: banner kèm key và tình trạng
+model của thư mục, danh sách lệnh hay dùng (mỗi lệnh có một dòng giải thích; nằm
+bên phải banner, hoặc bên dưới khi cửa sổ hẹp), rồi vòng lặp `›` để gõ lệnh mà
+không cần lặp lại `ccc`.
 
 ```
   › check
@@ -145,24 +185,43 @@ không có chuyện một lệnh cư xử khác nhau giữa hai chế độ.
 
 | Lệnh | Việc nó làm |
 |---|---|
-| `ccc lite` | Thiết lập project cho LiteLLM gateway (khuyên dùng) |
+| `ccc lite` | Thiết lập project cho LiteLLM gateway của team (khuyên dùng) |
 | `ccc init` | Copy config mẫu, áp key mặc định từ `keys.json` |
+| `ccc init --base-url <url>` | Như trên nhưng trỏ sang gateway khác, tự chọn model theo gateway đó |
 | `ccc permission` (`ccc p`) | Thêm danh sách tool được phép vào settings |
+| `ccc ui` | Mở giao diện toàn màn hình: key, model, config, kiểm tra |
+
+### Model
+
+| Lệnh | Việc nó làm |
+|---|---|
+| `ccc models` | Liệt kê model gateway trả về cho key, cái nào dùng được, slot nào đang dùng |
+| `ccc models pick` | Chọn model cho từng slot của thư mục này (toàn màn hình) |
+| `ccc models set <slot> <model>` | Đặt một slot; kiểm với gateway trước khi ghi |
+
+```bash
+ccc models set opus claude-opus-5-vn
+ccc models set sonnet 'claude-sonnet-5-vn[1m]'
+ccc models set custom none              # xoá slot custom
+ccc models set opus some-model --force  # ghi luôn, không hỏi gateway
+```
+
+Slot hợp lệ: `main`, `sonnet`, `opus`, `haiku`, `custom`. `ccc` từ chối để
+trống slot bắt buộc và từ chối `[1m]` cho model không có bản 1M.
 
 ### Kiểm tra
 
 | Lệnh | Việc nó làm |
 |---|---|
-| `ccc check` | Kiểm key, model discovery, và từng biến model đã pin |
-| `ccc models` | Liệt kê model gateway trả về, đánh dấu cái nào dùng được |
-| `ccc doctor` | Kiểm môi trường: Claude Code, config, và thứ đang ghi đè config |
+| `ccc check` | Kiểm thư mục đã setup chưa, key, discovery, và từng slot model |
+| `ccc doctor` | Kiểm môi trường: Claude Code, config, và thứ đang ghi đè config (không cần mạng) |
 | `ccc show config` | In config hiện tại (key đã che) |
 
 ### Quản lý key
 
 ```bash
-ccc key                 # mở TUI quản lý key
-ccc key add <tên> <giá trị>
+ccc key                 # mở TUI ở màn Keys
+ccc key add <tên> [giá trị]   # bỏ trống giá trị thì được hỏi, nhập ẩn
 ccc key list
 ccc key default [tên]   # đặt key mặc định trong ~/.ccc/keys.json
 ccc key use [tên]       # áp key cho thư mục hiện tại
@@ -190,7 +249,11 @@ Lưu ý shell: `[` và `]` là ký tự đặc biệt trong PowerShell và zsh. 
 parse, bọc giá trị trong nháy đơn: `ccc config set sonnet_model 'claude-sonnet-5-vn[1m]'`.
 
 Các khoá hợp lệ: `base_url`, `main_model`, `fast_model`, `model`, `sonnet_model`,
-`opus_model`, `haiku_model`, `discovery`, `disable_traffic`.
+`opus_model`, `haiku_model`, `custom_model`, `discovery`, `disable_traffic`,
+`model_filter`.
+
+`model_filter` là quy tắc của chính `ccc` (lưu ở `~/.ccc/ccc.json`), không phải
+biến Claude Code đọc — xem mục [Gateway khác](#gateway-khác).
 
 Lưu ý: `ccc config` sửa file **mẫu** ở `~/.ccc/.claude/settings.local.json`, mà
 Claude Code **không đọc**. File mẫu chỉ được `ccc init` / `ccc lite` copy sang
@@ -231,21 +294,78 @@ Trên Windows, `ccc.exe` đang chạy nên không tự xoá được ngay; lện
 còn lại rồi hẹn xoá nốt thư mục vài giây sau khi tiến trình thoát. Nhớ khởi động
 lại terminal để PATH cập nhật.
 
-## TUI quản lý key
+## Giao diện toàn màn hình
 
-Chạy `ccc key` không kèm lệnh con sẽ mở giao diện toàn màn hình. (`ccc` trơn
-không mở TUI nữa — xem mục [Chế độ tương tác](#chế-độ-tương-tác) bên dưới.)
+`ccc ui` mở ở màn **Home**, `ccc key` mở ở màn **Keys**, `ccc models pick` mở ở
+màn **Models**. (`ccc` trơn mở [chế độ tương tác](#chế-độ-tương-tác), không phải
+TUI.)
+
+Mọi màn đều ghi phím tắt ở dòng cuối; `?` mở bảng đầy đủ kèm giải thích. `Esc`
+quay lại, `q` thoát, Ctrl-C thoát ở bất cứ đâu. Cửa sổ nhỏ hơn 64×20 thì màn
+hình báo cần phóng to thay vì vẽ lệch.
+
+| Màn | Nội dung |
+|---|---|
+| Home | Tình trạng thư mục (key, gateway, model), 4 bước "Getting started" và bước tiếp theo, lối vào các màn khác (`1`–`4`) |
+| Keys | Các key đã lưu: `★` là mặc định cho thư mục mới, `●` là key thư mục này đang dùng |
+| Models | Chọn model cho từng slot từ danh sách gateway trả về cho key |
+| Config | Những gì Claude Code đọc ở thư mục này, key đã che |
+| Check | Giống `ccc check` |
+
+### Màn Keys
 
 | Phím | Hành động |
 |---|---|
 | `↑` `↓` hoặc `j` `k` | Di chuyển |
-| `a` | Thêm key mới |
-| `d` | Đặt key đang chọn làm mặc định |
+| `a` | Thêm key (tên, rồi tới key — phần key nhập ẩn) |
 | `u` | Dùng key đang chọn cho thư mục hiện tại |
-| `r` | Xoá key (có xác nhận) |
-| `n` | Đổi tên key |
+| `d` | Đặt key đang chọn làm mặc định |
+| `m` | Chọn model cho thư mục này bằng key đang chọn |
 | `s` | Kiểm tra tất cả key |
-| `q` hoặc `Esc` | Thoát |
+| `n` / `r` | Đổi tên / xoá (có hỏi lại) |
+
+### Màn Models
+
+Màn này hỏi gateway danh sách model của key (key của thư mục, hoặc key bạn chọn
+bằng `m` ở màn Keys), chỉ cho chọn những model key dùng được, rồi ghi vào
+`.claude/settings.local.json`.
+
+| Phím | Hành động |
+|---|---|
+| `↑` `↓` | Chọn slot (hoặc model, khi đang ở danh sách model) |
+| `→` / `Enter` | Chọn model cho slot |
+| `←` / `Esc` | Quay lại danh sách slot, rồi về Home |
+| `w` / Ctrl-S | Lưu |
+| `f` | Tự điền các slot trống hoặc đang dùng model không hợp lệ |
+| `1` | Bật/tắt 1M context (chỉ Sonnet và Opus) |
+| `g` | Bật/tắt discovery |
+| `e` / `x` | Gõ / xoá model Custom |
+| `r` | Tải lại danh sách |
+
+Rời màn khi chưa lưu thì `ccc` hỏi lại. Nếu danh sách được lấy bằng một key mà
+thư mục chưa dùng, lúc lưu `ccc` hỏi có dùng luôn key đó cho thư mục không —
+model phải đi cùng key truy cập được chúng.
+
+## Gateway khác
+
+`ccc` không bị gắn chặt vào gateway của team. Quy tắc "model nào dùng được" tuỳ
+gateway:
+
+| Gateway | Bộ lọc | Model dùng được |
+|---|---|---|
+| Gateway của team | `-vn` | Model gateway trả về có đuôi `-vn` |
+| Gateway khác | không lọc | Mọi model gateway trả về cho key |
+
+```bash
+ccc init --base-url https://gateway-khac.example.com   # trỏ project sang gateway khác
+ccc config set model_filter -xyz                        # tự đặt hậu tố
+ccc config set model_filter none                        # tắt lọc
+ccc config set model_filter auto                        # về mặc định
+```
+
+Gateway phải hỗ trợ Anthropic Messages API (`/v1/messages`). Anthropic không hỗ
+trợ chạy Claude Code bằng model không phải Claude qua gateway, kể cả khi gateway
+tự chuyển đổi được.
 
 ## Xử lý sự cố
 
@@ -258,7 +378,8 @@ Bạn đang chọn model không có `-vn`. Chạy `ccc check` — nó sẽ chỉ
 
 Kiểm tra theo thứ tự:
 
-1. `ccc check` — biến `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY` đã bằng `"1"` chưa
+1. `ccc check` — discovery đã bật chưa (dòng `Discovery`). Tắt thì `/model` chỉ
+   hiện alias; alias vẫn dùng được, chỉ là không thấy tên thật
 2. `ccc models` — gateway có thực sự trả về model `-vn` cho key của bạn không
 3. `ccc doctor` — có gì ưu tiên cao hơn đang ghi đè không
 
@@ -290,8 +411,8 @@ Gateway có thể liệt kê nhiều model hơn số model key bạn được ph
 - **Không gửi virtual key qua chat**, không commit vào source dùng chung.
 - `ccc lite` nhập key ở chế độ ẩn, key không nằm lại trong lịch sử terminal.
 - `ccc show` và `ccc config list` che key trước khi in, an toàn khi share màn hình.
-- `ccc init` / `ccc lite` / `ccc key use` tự thêm `.claude/settings.local.json`
-  vào `.gitignore` — chỉ đúng file chứa key, không ignore cả thư mục `.claude/`,
+- `ccc init` / `ccc lite` / `ccc key use` / lưu model (khi file có key) tự thêm
+  `.claude/settings.local.json` vào `.gitignore` — chỉ đúng file chứa key, không ignore cả thư mục `.claude/`,
   để `settings.json`, `skills/`, `commands/` của project vẫn commit được như
   bình thường. Nếu `.gitignore` đã có sẵn dòng đó (hoặc đã ignore cả `.claude/`)
   thì `ccc` không ghi thêm gì.

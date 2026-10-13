@@ -152,7 +152,8 @@ ui::print_header(&ui::ICON_SEARCH, "Tiêu đề");
 ui::print_row("Nhãn", "giá trị");
 ui::print_separator();
 ui::print_check(true, "Mục kiểm tra", "chi tiết");   // true = ✅, false = ❌
-ui::print_result_line(pass, fail);
+ui::print_status(Status::Warn, "Mục", "chi tiết");  // Pass ✅ · Warn 🟡 · Fail ❌ · Info ➖
+ui::print_result_line(pass, warn, fail);
 ui::print_footer();
 ```
 
@@ -187,18 +188,31 @@ set_auth_token(&mut json, &token);   // ghi AUTH_TOKEN và xoá API_KEY cũ
 
 ### Tên model
 
-Mọi tên model phải kết thúc bằng `-vn`, có thể theo sau bởi marker context
-`[1m]` (vd `claude-sonnet-5-vn[1m]`). Kiểm tra bằng:
+Model "dùng được" là model gateway liệt kê cho key **và** qua bộ lọc của gateway
+đó (`-vn` trên gateway của team, không lọc ở gateway khác, hoặc `model_filter`
+trong `~/.ccc/ccc.json`). Có thể có marker context `[1m]`
+(vd `claude-sonnet-5-vn[1m]`). Kiểm tra bằng:
 
 ```rust
-use crate::api::is_vn_model;
+use crate::api::{matches_filter, model_filter_for, usable_models};
 
-if !is_vn_model(&model) {
+let filter = model_filter_for(&base_url);
+if !matches_filter(&model, &filter) {
     // model này sẽ nhận 403
 }
+let usable = usable_models(&models_from_gateway, &filter);
 ```
 
-`is_vn_model()` tự strip `[1m]` nên nhận cả hai dạng.
+`matches_filter()` tự strip `[1m]` nên nhận cả hai dạng.
+
+Đọc/ghi slot model thì dùng `slots.rs`, đừng gán thẳng vào `json["env"]`:
+
+```rust
+use crate::slots::{self, OPUS};
+
+slots::write(&mut json, OPUS, Some("claude-opus-5-vn"));
+let changes = slots::fit(&mut json, &usable);   // sửa slot trống/không hợp lệ
+```
 
 Khi **so khớp với danh sách model gateway trả về**, phải strip marker trước —
 gateway chỉ biết id trần:
@@ -210,7 +224,14 @@ let allowed = models.iter().any(|m| m == base_model_id(&model));
 ```
 
 Dùng `m == model` trực tiếp sẽ báo "not in your key's model list" giả với mọi
-config có `[1m]`.
+config có `[1m]`. `api::is_listed(&model, &models)` làm sẵn việc này.
+
+### Vẽ TUI
+
+Mỗi màn bắt đầu bằng `widgets::page(frame, area, "Tên", &HINTS)` và vẽ vào vùng
+nó trả về. Chữ có thể dài (đường dẫn, URL, tên model) thì cắt bằng
+`widgets::fit` / `fit_middle` / `fit_models`, đừng để viền cắt. Thêm màn mới thì
+thêm nó vào test `every_screen_fits_every_supported_size` trong `tui/app.rs`.
 
 ## Quy trình release
 
@@ -261,6 +282,7 @@ docker run --rm -v "${PWD}:/app" -w /app rust:1.98 cargo update -w
 ## Danh sách kiểm tra trước khi commit
 
 - [ ] `cargo check` không có lỗi
+- [ ] `cargo test` pass, `cargo clippy --all-targets` không cảnh báo
 - [ ] `cargo fmt` đã chạy
 - [ ] Không có API key nào lọt vào file được git theo dõi
 - [ ] `default/.claude/settings.local.json` vẫn không chứa key
