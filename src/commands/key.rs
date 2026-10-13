@@ -97,13 +97,11 @@ fn cmd_add(name: Option<String>, value: Option<String>) -> Result<()> {
     };
 
     if name.is_empty() {
-        eprintln!("Name cannot be empty.");
-        return Ok(());
+        anyhow::bail!("Name cannot be empty.");
     }
 
     if let Err(e) = validate_key_format(&value) {
-        eprintln!("{e}");
-        return Ok(());
+        anyhow::bail!(e);
     }
 
     let mut store = KeysStore::load();
