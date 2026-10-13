@@ -156,8 +156,14 @@ pub fn shows_in_picker(id: &str) -> bool {
     id.contains("claude") || id.contains("anthropic")
 }
 
-/// Compare with digit runs as numbers, so `4-10` sorts after `4-9` and a
-/// version bump never ends up in the middle of the list.
+/// A digit run this long is a release date ("20250514"), not a version number.
+const DATE_DIGITS: usize = 6;
+
+/// Compare model ids the way their versions read, so sorting puts the newest
+/// last: digit runs compare as numbers (`4-10` after `4-9`), one more version
+/// number beats a suffix (`opus-5-5-vn`, Opus 5.5, after `opus-5-vn`), and
+/// any version number beats a release date (`opus-4-1-20250805` after
+/// `opus-4-20250514`).
 pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     let (mut i, mut j) = (0, 0);
@@ -173,6 +179,10 @@ pub fn natural_cmp(a: &str, b: &str) -> Ordering {
             }
             let x = std::str::from_utf8(&a[start_i..i]).unwrap_or("0");
             let y = std::str::from_utf8(&b[start_j..j]).unwrap_or("0");
+            let (x_date, y_date) = (x.len() >= DATE_DIGITS, y.len() >= DATE_DIGITS);
+            if x_date != y_date {
+                return if x_date { Ordering::Less } else { Ordering::Greater };
+            }
             // Compare by length after stripping zeros, then lexically: works
             // for numbers of any size without parsing.
             let (x, y) = (x.trim_start_matches('0'), y.trim_start_matches('0'));
@@ -180,6 +190,10 @@ pub fn natural_cmp(a: &str, b: &str) -> Ordering {
             if ord != Ordering::Equal {
                 return ord;
             }
+        } else if a[i].is_ascii_digit() != b[j].is_ascii_digit() {
+            // One id carries on with another version number where the other
+            // moves on to a suffix or a name.
+            return if a[i].is_ascii_digit() { Ordering::Greater } else { Ordering::Less };
         } else {
             let ord = a[i].to_ascii_lowercase().cmp(&b[j].to_ascii_lowercase());
             if ord != Ordering::Equal {
@@ -281,6 +295,22 @@ mod tests {
         assert_eq!(natural_cmp("claude-sonnet-5-vn", "claude-sonnet-4-6-vn"), Ordering::Greater);
         assert_eq!(natural_cmp("a", "a"), Ordering::Equal);
         assert_eq!(natural_cmp("a-1", "a-1-x"), Ordering::Less);
+    }
+
+    #[test]
+    fn a_point_release_is_newer_than_its_major() {
+        // Opus 5.5 after Opus 5, even though "5-vn" has a letter where "5-5-vn" has a digit.
+        assert_eq!(natural_cmp("claude-opus-5-5-vn", "claude-opus-5-vn"), Ordering::Greater);
+        assert_eq!(natural_cmp("claude-opus-5-vn", "claude-opus-5-5-vn"), Ordering::Less);
+        // A version number outranks a release date.
+        assert_eq!(natural_cmp("claude-opus-4-1-20250805", "claude-opus-4-20250514"), Ordering::Greater);
+        assert_eq!(natural_cmp("claude-sonnet-4-5-20250929", "claude-sonnet-4-20250514"), Ordering::Greater);
+        // Two dates still compare as dates.
+        assert_eq!(natural_cmp("claude-x-20250929", "claude-x-20250514"), Ordering::Greater);
+
+        let list = models(&["claude-opus-4-8-vn", "claude-opus-5-vn", "claude-opus-5-5-vn", "claude-sonnet-5-vn"]);
+        assert_eq!(suggest(OPUS, &list).as_deref(), Some("claude-opus-5-5-vn"));
+        assert_eq!(ordered_for(OPUS, &list)[..3], ["claude-opus-5-5-vn", "claude-opus-5-vn", "claude-opus-4-8-vn"]);
     }
 
     #[test]
