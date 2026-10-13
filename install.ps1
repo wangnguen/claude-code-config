@@ -4,19 +4,15 @@ $CccHome = "$env:USERPROFILE\.ccc"
 $Repo = "wangnguen/claude-code-config"
 $AssetName = "ccc-x86_64-pc-windows-msvc.zip"
 
-Write-Host "Fetching latest release..." -ForegroundColor Cyan
-$Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
-$Asset = ($Release.assets | Where-Object { $_.name -eq $AssetName })
-
-if (-not $Asset) {
-    Write-Host "Release asset not found!" -ForegroundColor Red
-    exit 1
-}
+# A plain release download rather than api.github.com: the API allows 60
+# unauthenticated requests an hour per IP, which an office sharing one
+# address runs out of.
+$DownloadUrl = "https://github.com/$Repo/releases/latest/download/$AssetName"
 
 # Download zip
 Write-Host "Downloading $AssetName..." -ForegroundColor Cyan
 $TmpZip = "$env:TEMP\ccc.zip"
-Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $TmpZip
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $TmpZip -UseBasicParsing
 
 # Extract to temp, then copy contents to CccHome
 $TmpDir = "$env:TEMP\ccc-extract"

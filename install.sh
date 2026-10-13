@@ -21,15 +21,10 @@ esac
 
 ASSET_NAME="ccc-${TARGET}.zip"
 
-echo "Fetching latest release..."
-DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-    | grep "browser_download_url.*$ASSET_NAME\"" \
-    | cut -d '"' -f 4)
-
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo "Failed to get download URL!"
-    exit 1
-fi
+# A plain release download rather than api.github.com: the API allows 60
+# unauthenticated requests an hour per IP, which an office sharing one
+# address runs out of.
+DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$ASSET_NAME"
 
 # Download zip
 echo "Downloading $ASSET_NAME..."
