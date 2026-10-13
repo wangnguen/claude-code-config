@@ -64,7 +64,7 @@ ccc check
 # List the models your key can use, and which slots use them
 ccc models
 
-# Choose this folder's models (full-screen picker)
+# Choose this folder's models: arrow keys and Enter, each choice saved at once
 ccc models pick
 
 # Set one slot directly (checked against the gateway first)
@@ -206,8 +206,9 @@ copies — Claude Code never reads it.
 
 ## Full-screen UI
 
-`ccc ui` opens on **Home**; `ccc key` opens on **Keys**; `ccc models pick` opens
-on **Models**. Every screen lists its keys on the bottom line, and `?` shows
+`ccc ui` opens on **Home**; `ccc key` opens on **Keys**; the **Models** screen
+is in Home's menu (`ccc models pick` asks the same questions without taking
+over the screen). Every screen lists its keys on the bottom line, and `?` shows
 all of them with a short explanation. `Esc` goes back, `q` quits.
 
 | Screen | What it does |

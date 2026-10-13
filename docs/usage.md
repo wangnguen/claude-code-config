@@ -196,7 +196,7 @@ không có chuyện một lệnh cư xử khác nhau giữa hai chế độ.
 | Lệnh | Việc nó làm |
 |---|---|
 | `ccc models` | Liệt kê model gateway trả về cho key, cái nào dùng được, slot nào đang dùng |
-| `ccc models pick` | Chọn model cho từng slot của thư mục này (toàn màn hình) |
+| `ccc models pick` | Chọn model cho từng slot của thư mục này bằng phím mũi tên + Enter, chọn xong là lưu luôn |
 | `ccc models set <slot> <model>` | Đặt một slot; kiểm với gateway trước khi ghi |
 
 ```bash
@@ -303,9 +303,9 @@ lại terminal để PATH cập nhật.
 
 ## Giao diện toàn màn hình
 
-`ccc ui` mở ở màn **Home**, `ccc key` mở ở màn **Keys**, `ccc models pick` mở ở
-màn **Models**. (`ccc` trơn mở [chế độ tương tác](#chế-độ-tương-tác), không phải
-TUI.)
+`ccc ui` mở ở màn **Home**, `ccc key` mở ở màn **Keys**; màn **Models** nằm
+trong menu của Home. (`ccc` trơn mở [chế độ tương tác](#chế-độ-tương-tác), không phải TUI;
+`ccc models pick` hỏi lần lượt ngay trong terminal, không chiếm cả màn hình.)
 
 Mọi màn đều ghi phím tắt ở dòng cuối; `?` mở bảng đầy đủ kèm giải thích. `Esc`
 quay lại, `q` thoát, Ctrl-C thoát ở bất cứ đâu. Cửa sổ nhỏ hơn 64×20 thì màn

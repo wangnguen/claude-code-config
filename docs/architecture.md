@@ -26,7 +26,8 @@ ccc/
 │   │   ├── key.rs              `ccc key ...`
 │   │   ├── config.rs           `ccc config ...`
 │   │   ├── check.rs            `ccc check` (in báo cáo của checks.rs)
-│   │   ├── models.rs           `ccc models [list|pick|set]`
+│   │   ├── models.rs           `ccc models [list|set]`
+│   │   ├── pick.rs             `ccc models pick`: chọn model bằng phím mũi tên, không chiếm màn hình
 │   │   ├── doctor.rs           `ccc doctor`
 │   │   ├── permission.rs       `ccc permission`
 │   │   ├── show.rs             `ccc show`
@@ -37,7 +38,7 @@ ccc/
 │   │   ├── version.rs          `ccc version`
 │   │   └── completions.rs      `ccc completions`
 │   │
-│   └── tui/                    Giao diện toàn màn hình (`ccc ui`, `ccc key`, `ccc models pick`)
+│   └── tui/                    Giao diện toàn màn hình (`ccc ui`, `ccc key`)
 │       ├── mod.rs
 │       ├── app.rs              Bộ điều phối: Screen, Action, overlay, test vẽ màn hình
 │       ├── event.rs            Mở/đóng terminal, vòng lặp đọc phím

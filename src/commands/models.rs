@@ -17,7 +17,7 @@ use crate::utils::{ignore_local_settings, mask_key};
 pub enum ModelsCmd {
     /// List the models the current key can reach (the default)
     List,
-    /// Choose this folder's models in a full-screen picker
+    /// Choose this folder's models with the arrow keys, one slot at a time
     Pick,
     /// Set one model slot in this folder's .claude/settings.local.json
     Set {
@@ -34,7 +34,7 @@ pub enum ModelsCmd {
 pub fn run(subcmd: Option<ModelsCmd>) -> Result<()> {
     match subcmd.unwrap_or(ModelsCmd::List) {
         ModelsCmd::List => list(),
-        ModelsCmd::Pick => crate::tui::run(crate::tui::Screen::Models),
+        ModelsCmd::Pick => super::pick::run(),
         ModelsCmd::Set { slot, model, force } => set(&slot, &model, force),
     }
 }

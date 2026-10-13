@@ -7,6 +7,7 @@ pub mod key;
 pub mod lite;
 pub mod models;
 pub mod permission;
+pub mod pick;
 pub mod shell;
 pub mod show;
 pub mod splash;
